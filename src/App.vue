@@ -2,13 +2,13 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { openPath } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 import { loadState, saveState } from "./launcher/storage";
 import type { AppEntry, Group, LauncherState } from "./launcher/types";
 import {
   addAppsToGroup,
+  createDefaultState,
   createId,
   normalizeDroppedPaths,
   parseArgs,
@@ -18,10 +18,12 @@ function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-const state = reactive<LauncherState>(loadState());
+const state = reactive<LauncherState>(createDefaultState());
 const search = ref("");
 const dragActive = ref(false);
 const toast = ref<string | null>(null);
+const hydrated = ref(false);
+let saveTimer: number | null = null;
 
 const activeGroup = computed<Group | undefined>(() =>
   state.groups.find((g) => g.id === state.activeGroupId),
@@ -35,14 +37,25 @@ const filteredApps = computed<AppEntry[]>(() => {
   return group.apps.filter((a) => a.name.toLowerCase().includes(q));
 });
 
-watch(
-  state,
-  () => {
+function applyLoadedState(loaded: LauncherState): void {
+  state.version = loaded.version;
+  state.activeGroupId = loaded.activeGroupId;
+  state.groups.splice(0, state.groups.length, ...loaded.groups);
+}
+
+function scheduleSave(): void {
+  if (!hydrated.value) return;
+  if (saveTimer) window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
+    saveTimer = null;
     const plain = JSON.parse(JSON.stringify(state)) as LauncherState;
-    saveState(plain);
-  },
-  { deep: true },
-);
+    saveState(plain).catch(() => {
+      // ignore
+    });
+  }, 250);
+}
+
+watch(state, scheduleSave, { deep: true });
 
 function showToast(message: string): void {
   toast.value = message;
@@ -110,10 +123,6 @@ async function launch(entry: AppEntry): Promise<void> {
   }
   try {
     const argText = (entry.args ?? "").trim();
-    if (!argText) {
-      await openPath(entry.path);
-      return;
-    }
     await invoke("spawn_app", { path: entry.path, args: parseArgs(argText) });
   } catch (e) {
     const details =
@@ -219,6 +228,13 @@ onMounted(async () => {
   window.addEventListener("click", closeMenu);
   window.addEventListener("blur", closeMenu);
 
+  try {
+    const loaded = await loadState();
+    applyLoadedState(loaded);
+  } finally {
+    hydrated.value = true;
+  }
+
   if (!isTauriRuntime()) return;
 
   const drop = async (payload: unknown) => {
@@ -251,6 +267,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener("click", closeMenu);
   window.removeEventListener("blur", closeMenu);
+  if (saveTimer) window.clearTimeout(saveTimer);
   for (const unlisten of unlistenFns) unlisten();
   unlistenFns = [];
 });

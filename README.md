@@ -9,7 +9,7 @@
 - Click a card to launch via `@tauri-apps/plugin-opener`
 - Right click blank area to add apps / groups
 - Drag files into the window to add to the active group
-- Local persistence via `localStorage`
+- Persistence via SQLite (`launcher.db`) in app local data directory (Windows: `%LOCALAPPDATA%\\<app-id>\\launcher.db`)
 
 ## Dev
 
