@@ -3,6 +3,7 @@ export type AppEntry = {
   name: string;
   path: string;
   args?: string;
+  icon?: string;
   addedAt: number;
 };
 

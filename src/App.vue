@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { loadState, saveState } from "./launcher/storage";
 import type { AppEntry, Group, LauncherState } from "./launcher/types";
@@ -18,6 +19,8 @@ function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+const tauriRuntime = isTauriRuntime();
+
 const state = reactive<LauncherState>(createDefaultState());
 const search = ref("");
 const dragActive = ref(false);
@@ -27,6 +30,15 @@ let saveTimer: number | null = null;
 
 const activeGroup = computed<Group | undefined>(() =>
   state.groups.find((g) => g.id === state.activeGroupId),
+);
+
+watch(
+  activeGroup,
+  (group) => {
+    if (!group) return;
+    hydrateEntryIcons(group.apps);
+  },
+  { flush: "post" },
 );
 
 const filteredApps = computed<AppEntry[]>(() => {
@@ -85,8 +97,6 @@ function renameGroup(group: Group): void {
 
 function removeGroup(group: Group): void {
   if (state.groups.length <= 1) return;
-  const ok = window.confirm(`Remove group "${group.name}"?`);
-  if (!ok) return;
   const idx = state.groups.findIndex((g) => g.id === group.id);
   if (idx >= 0) state.groups.splice(idx, 1);
   if (state.activeGroupId === group.id) {
@@ -98,7 +108,10 @@ function addPathsToActiveGroup(paths: string[]): void {
   const group = activeGroup.value;
   if (!group) return;
   const added = addAppsToGroup(group, paths);
-  if (added > 0) showToast(`Added ${added} item(s)`);
+  if (added.length > 0) {
+    showToast(`Added ${added.length} item(s)`);
+    hydrateEntryIcons(added);
+  }
 }
 
 async function pickAndAddApps(): Promise<void> {
@@ -143,6 +156,56 @@ async function launch(entry: AppEntry): Promise<void> {
   }
 }
 
+async function minimizeWindow(): Promise<void> {
+  if (!tauriRuntime) return;
+  try {
+    await getCurrentWindow().minimize();
+  } catch (e) {
+    showToast(
+      `Minimize failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
+async function toggleMaximizeWindow(): Promise<void> {
+  if (!tauriRuntime) return;
+  try {
+    await getCurrentWindow().toggleMaximize();
+  } catch (e) {
+    showToast(
+      `Toggle maximize failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
+async function closeWindow(): Promise<void> {
+  if (!tauriRuntime) return;
+  try {
+    await getCurrentWindow().close();
+  } catch (e) {
+    showToast(
+      `Close failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
+async function hydrateEntryIcons(entries: AppEntry[]): Promise<void> {
+  if (!tauriRuntime) return;
+  if (!hydrated.value) return;
+  const pending = entries.filter((e) => !e.icon);
+  if (pending.length === 0) return;
+  await Promise.allSettled(
+    pending.map(async (entry) => {
+      const icon = (await invoke("get_file_icon", {
+        path: entry.path,
+      })) as unknown;
+      if (typeof icon === "string" && icon.trim()) {
+        entry.icon = icon;
+      }
+    }),
+  );
+}
+
 type MenuKind = "blank" | "app" | "group";
 const menu = reactive<{
   open: boolean;
@@ -178,8 +241,6 @@ function openMenu(
 function removeApp(entry: AppEntry): void {
   const group = activeGroup.value;
   if (!group) return;
-  const ok = window.confirm(`Remove "${entry.name}"?`);
-  if (!ok) return;
   const idx = group.apps.findIndex((a) => a.id === entry.id);
   if (idx >= 0) group.apps.splice(idx, 1);
 }
@@ -217,7 +278,14 @@ function saveEditor(): void {
   const entry = group.apps.find((a) => a.id === editor.entryId);
   if (!entry) return;
   entry.name = editor.name.trim() || entry.name;
-  entry.path = editor.path.trim() || entry.path;
+  const nextPath = editor.path.trim() || entry.path;
+  if (nextPath !== entry.path) {
+    entry.path = nextPath;
+    entry.icon = undefined;
+    hydrateEntryIcons([entry]);
+  } else {
+    entry.path = nextPath;
+  }
   entry.args = editor.args;
   closeEditor();
 }
@@ -234,6 +302,8 @@ onMounted(async () => {
   } finally {
     hydrated.value = true;
   }
+
+  hydrateEntryIcons(activeGroup.value?.apps ?? []);
 
   if (!isTauriRuntime()) return;
 
@@ -275,10 +345,31 @@ onUnmounted(() => {
 
 <template>
   <div class="app" @contextmenu="(e) => openMenu('blank', e)">
-    <header class="topbar" data-tauri-drag-region>
-      <div class="topbar__title">Quick Launcher</div>
-      <div class="topbar__spacer" />
-      <input v-model="search" class="topbar__search" placeholder="Search..." />
+    <header class="topbar">
+      <div class="topbar__drag" data-tauri-drag-region @dblclick="toggleMaximizeWindow()">
+        <div class="topbar__title">Quick Launcher</div>
+      </div>
+
+      <div class="topbar__right">
+        <input v-model="search" class="topbar__search" placeholder="Search..." />
+
+        <div v-if="tauriRuntime" class="winControls">
+          <button class="winBtn" type="button" aria-label="Minimize" @click="minimizeWindow()">
+            —
+          </button>
+          <button class="winBtn" type="button" aria-label="Maximize" @click="toggleMaximizeWindow()">
+            ☐
+          </button>
+          <button
+            class="winBtn winBtn--close"
+            type="button"
+            aria-label="Close"
+            @click="closeWindow()"
+          >
+            ×
+          </button>
+        </div>
+      </div>
     </header>
 
     <div class="content">
@@ -323,8 +414,9 @@ onUnmounted(() => {
             @click="launch(a)"
             @contextmenu.stop="(e) => openMenu('app', e, a.id)"
           >
-            <div class="card__icon" aria-hidden="true">
-              {{ a.name.slice(0, 1).toUpperCase() }}
+            <div class="card__icon" :class="{ 'card__icon--img': !!a.icon }" aria-hidden="true">
+              <img v-if="a.icon" class="card__iconImg" :src="a.icon" alt="" />
+              <template v-else>{{ a.name.slice(0, 1).toUpperCase() }}</template>
             </div>
             <div class="card__name" :title="a.name">{{ a.name }}</div>
           </button>
@@ -509,6 +601,13 @@ input {
   backdrop-filter: blur(12px);
 }
 
+.topbar__drag {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
 .topbar__title {
   font-weight: 600;
   letter-spacing: 0.2px;
@@ -516,8 +615,10 @@ input {
   opacity: 0.95;
 }
 
-.topbar__spacer {
-  flex: 1;
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .topbar__search {
@@ -534,6 +635,39 @@ input {
 .topbar__search:focus {
   border-color: rgba(86, 135, 255, 0.6);
   box-shadow: 0 0 0 3px rgba(86, 135, 255, 0.2);
+}
+
+.winControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.winBtn {
+  width: 36px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+  line-height: 0;
+  display: grid;
+  place-items: center;
+  user-select: none;
+}
+
+.winBtn:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.winBtn:active {
+  transform: translateY(0.5px);
+}
+
+.winBtn--close:hover {
+  background: rgba(255, 90, 90, 0.22);
+  border-color: rgba(255, 90, 90, 0.4);
 }
 
 .content {
@@ -703,6 +837,18 @@ input {
     rgba(86, 135, 255, 0.9),
     rgba(24, 200, 219, 0.85)
   );
+  overflow: hidden;
+}
+
+.card__icon--img {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.card__iconImg {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
 }
 
 .card__name {

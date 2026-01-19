@@ -46,7 +46,7 @@ export function normalizeDroppedPaths(payload: unknown): string[] {
   return [];
 }
 
-export function addAppsToGroup(group: Group, filePaths: string[]): number {
+export function addAppsToGroup(group: Group, filePaths: string[]): AppEntry[] {
   const existing = new Set(group.apps.map((a) => a.path));
   const now = Date.now();
   const toAdd: AppEntry[] = [];
@@ -57,13 +57,14 @@ export function addAppsToGroup(group: Group, filePaths: string[]): number {
       name: suggestAppName(p),
       path: p,
       args: "",
+      icon: undefined,
       addedAt: now,
     });
     existing.add(p);
   }
-  if (toAdd.length === 0) return 0;
+  if (toAdd.length === 0) return [];
   group.apps.unshift(...toAdd);
-  return toAdd.length;
+  return toAdd;
 }
 
 export function parseArgs(args: string): string[] {

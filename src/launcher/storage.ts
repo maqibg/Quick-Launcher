@@ -27,6 +27,7 @@ function isValidState(value: unknown): value is LauncherState {
         typeof a.name === "string" &&
         typeof a.path === "string" &&
         (typeof a.args === "undefined" || typeof a.args === "string") &&
+        (typeof a.icon === "undefined" || typeof a.icon === "string") &&
         typeof a.addedAt === "number"
       );
     });
