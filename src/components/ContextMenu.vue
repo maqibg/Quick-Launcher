@@ -32,8 +32,8 @@ const emit = defineEmits<{
     @contextmenu.prevent
   >
     <template v-if="kind === 'blankMain'">
-      <button class="menu__item" type="button" @click="emit('addApp')">Add App...</button>
-      <button class="menu__item" type="button" @click="emit('addUwpApp')">Add UWP App...</button>
+      <button class="menu__item" type="button" @click="emit('addApp')">Add App</button>
+      <button class="menu__item" type="button" @click="emit('addUwpApp')">Add UWP App</button>
     </template>
 
     <template v-else-if="kind === 'blankSidebar'">
@@ -42,7 +42,7 @@ const emit = defineEmits<{
 
     <template v-else-if="kind === 'app'">
       <button class="menu__item" type="button" @click="emit('openApp')">Open</button>
-      <button class="menu__item" type="button" @click="emit('editApp')">Edit...</button>
+      <button class="menu__item" type="button" @click="emit('editApp')">Edit</button>
       <button class="menu__item menu__item--danger" type="button" @click="emit('removeApp')">
         Remove
       </button>
