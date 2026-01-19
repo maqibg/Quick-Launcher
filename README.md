@@ -1,21 +1,14 @@
-# Quick Launcher (Tauri + Vue3)
+# my-quickstart
 
-一个类似 Maye Lite 的快速启动工具雏形：左侧分组（Tab），右侧应用卡片，点击卡片启动应用；支持右键空白处添加与文件拖拽导入。
+一个快速启动工具
 
 ## Features
 
-- Groups (tabs) on the left
-- App cards grid on the right
-- Click a card to launch via `@tauri-apps/plugin-opener`
-- Right click blank area to add apps / groups
-- Drag files into the window to add to the active group
-- Persistence via SQLite (`launcher.db`) in app local data directory (Windows: `%LOCALAPPDATA%\\<app-id>\\launcher.db`)
+- 技术栈: tauri + vue3 + sqlite
+- 左侧分组（Tab），右侧应用卡片，点击卡片启动应用
+- 支持右键空白处添加与文件拖拽导入
 
-## Dev
 
-```bash
-pnpm install
-pnpm tauri dev
-```
+## 截图
 
-If you are missing desktop prerequisites (Rust / WebKit, etc.), follow the official Tauri prerequisites guide first.
+![alt text](image.png)
