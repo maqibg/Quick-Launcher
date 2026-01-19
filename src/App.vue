@@ -432,7 +432,7 @@ onUnmounted(() => {
         </label>
         <label class="field">
           <div class="field__label">Args</div>
-          <input v-model="editor.args" class="field__input" placeholder="--flag \"value with spaces\"" />
+          <input v-model="editor.args" class="field__input" placeholder='--flag "value with spaces"' />
         </label>
         <div class="modal__actions">
           <button class="btn" type="button" @click="closeEditor()">Cancel</button>
