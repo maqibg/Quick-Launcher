@@ -63,10 +63,46 @@ struct UiSettings {
     card_height: u32,
     #[serde(rename = "toggleHotkey", default)]
     toggle_hotkey: String,
+    #[serde(rename = "theme", default = "default_theme")]
+    theme: String,
+    #[serde(rename = "sidebarWidth", default = "default_sidebar_width")]
+    sidebar_width: u32,
+    #[serde(rename = "fontFamily", default = "default_font_family")]
+    font_family: String,
+    #[serde(rename = "fontSize", default = "default_font_size")]
+    font_size: u32,
+    #[serde(rename = "cardFontSize", default = "default_card_font_size")]
+    card_font_size: u32,
+    #[serde(rename = "cardIconScale", default = "default_card_icon_scale")]
+    card_icon_scale: u32,
 }
 
 fn default_card_height() -> u32 {
     96
+}
+
+fn default_theme() -> String {
+    "dark".to_string()
+}
+
+fn default_sidebar_width() -> u32 {
+    140
+}
+
+fn default_font_family() -> String {
+    "maye".to_string()
+}
+
+fn default_font_size() -> u32 {
+    13
+}
+
+fn default_card_font_size() -> u32 {
+    11
+}
+
+fn default_card_icon_scale() -> u32 {
+    56
 }
 
 impl Default for UiSettings {
@@ -75,6 +111,12 @@ impl Default for UiSettings {
             card_width: default_card_size(),
             card_height: default_card_height(),
             toggle_hotkey: String::new(),
+            theme: default_theme(),
+            sidebar_width: default_sidebar_width(),
+            font_family: default_font_family(),
+            font_size: default_font_size(),
+            card_font_size: default_card_font_size(),
+            card_icon_scale: default_card_icon_scale(),
         }
     }
 }

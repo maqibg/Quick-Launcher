@@ -17,6 +17,12 @@ export type UiSettings = {
   cardWidth: number;
   cardHeight: number;
   toggleHotkey: string;
+  theme: "dark" | "light";
+  sidebarWidth: number;
+  fontFamily: string;
+  fontSize: number;
+  cardFontSize: number;
+  cardIconScale: number;
 };
 
 export type LauncherState = {

@@ -1,18 +1,12 @@
 :root {
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  font-size: 14px;
-  color: #e9edf3;
-  background: #0b0f14;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-
 html,
 body {
   height: 100%;
 }
-
 body {
   margin: 0;
   overflow: hidden;
@@ -31,10 +25,52 @@ input {
   --card-height: 96px;
   --card-icon-size: 42px;
   --card-icon-img-size: 30px;
+  --card-font-size: 12px;
+  --sidebar-width: 150px;
+  --font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  --font-size: 14px;
+  --text: #e9edf3;
+  --divider: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.14);
+  --border-soft: rgba(255, 255, 255, 0.12);
+  --surface-strong: rgba(8, 10, 14, 0.8);
+  --surface: rgba(8, 10, 14, 0.4);
+  --surface-input: rgba(255, 255, 255, 0.06);
+  --surface-card: rgba(255, 255, 255, 0.05);
+  --surface-panel: rgba(12, 14, 18, 0.92);
+  --surface-empty: rgba(255, 255, 255, 0.03);
+  --surface-hover: rgba(255, 255, 255, 0.09);
+  --surface-hover-soft: rgba(255, 255, 255, 0.08);
+  --shadow-1: rgba(0, 0, 0, 0.5);
+  --shadow-2: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-family: var(--font-family);
+  font-size: var(--font-size);
   background:
     radial-gradient(900px 450px at 30% 20%, rgba(86, 135, 255, 0.16), transparent 55%),
     radial-gradient(700px 400px at 70% 10%, rgba(24, 200, 219, 0.14), transparent 50%),
     #0b0f14;
+}
+
+.app[data-theme="light"] {
+  --text: #0b1220;
+  --divider: rgba(0, 0, 0, 0.12);
+  --border: rgba(0, 0, 0, 0.14);
+  --border-soft: rgba(0, 0, 0, 0.12);
+  --surface-strong: rgba(255, 255, 255, 0.82);
+  --surface: rgba(255, 255, 255, 0.58);
+  --surface-input: rgba(0, 0, 0, 0.04);
+  --surface-card: rgba(255, 255, 255, 0.62);
+  --surface-panel: rgba(255, 255, 255, 0.86);
+  --surface-empty: rgba(255, 255, 255, 0.58);
+  --surface-hover: rgba(0, 0, 0, 0.07);
+  --surface-hover-soft: rgba(0, 0, 0, 0.06);
+  --shadow-1: rgba(0, 0, 0, 0.18);
+  --shadow-2: rgba(0, 0, 0, 0.12);
+  background:
+    radial-gradient(900px 450px at 30% 20%, rgba(86, 135, 255, 0.18), transparent 60%),
+    radial-gradient(700px 420px at 70% 10%, rgba(24, 200, 219, 0.16), transparent 55%),
+    #eef3fb;
 }
 
 .topbar {
@@ -43,8 +79,8 @@ input {
   align-items: center;
   gap: 10px;
   padding: 0 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(8, 10, 14, 0.8);
+  border-bottom: 1px solid var(--divider);
+  background: var(--surface-strong);
   backdrop-filter: blur(12px);
 }
 
@@ -73,8 +109,8 @@ input {
   height: 32px;
   padding: 0 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  background: var(--surface-input);
   color: inherit;
   outline: none;
 }
@@ -94,8 +130,8 @@ input {
   width: 36px;
   height: 32px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  background: var(--surface-input);
   color: inherit;
   cursor: pointer;
   line-height: 0;
@@ -105,7 +141,7 @@ input {
 }
 
 .winBtn:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--surface-hover);
 }
 
 .winBtn:active {
@@ -124,10 +160,10 @@ input {
 }
 
 .sidebar {
-  width: 180px;
+  width: var(--sidebar-width);
   padding: 10px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(8, 10, 14, 0.4);
+  border-right: 1px solid var(--divider);
+  background: var(--surface);
   display: flex;
   flex-direction: column;
 }
@@ -152,14 +188,14 @@ input {
   height: 34px;
   padding: 0 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  background: var(--surface-input);
   color: inherit;
   cursor: pointer;
 }
 
 .sidebar__settings:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--surface-hover);
 }
 
 .group {
@@ -177,7 +213,7 @@ input {
 }
 
 .group:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface-input);
 }
 
 .group--active {
@@ -228,8 +264,8 @@ input {
 .card {
   height: var(--card-height);
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-card);
   color: inherit;
   cursor: pointer;
   display: flex;
@@ -245,7 +281,7 @@ input {
 
 .card:hover {
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-hover-soft);
   border-color: rgba(86, 135, 255, 0.32);
 }
 
@@ -286,14 +322,15 @@ input {
   white-space: nowrap;
   text-overflow: ellipsis;
   opacity: 0.95;
+  font-size: var(--card-font-size);
 }
 
 .empty {
   grid-column: 1 / -1;
-  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border: 1px dashed var(--border);
   border-radius: 14px;
   padding: 18px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-empty);
 }
 
 .empty__title {
@@ -330,10 +367,10 @@ input {
   transform: translateX(-50%);
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(8, 10, 14, 0.8);
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
   backdrop-filter: blur(10px);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 28px var(--shadow-2);
 }
 
 .menu {
@@ -341,10 +378,10 @@ input {
   z-index: 50;
   min-width: 180px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(12, 14, 18, 0.92);
+  border: 1px solid var(--border);
+  background: var(--surface-panel);
   backdrop-filter: blur(12px);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 18px 60px var(--shadow-1);
   padding: 6px;
 }
 
@@ -361,7 +398,7 @@ input {
 }
 
 .menu__item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-hover-soft);
 }
 
 .menu__item--danger {
@@ -381,14 +418,14 @@ input {
 .modal__panel {
   width: min(560px, calc(100vw - 32px));
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(12, 14, 18, 0.92);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--border);
+  background: var(--surface-panel);
+  backdrop-filter: blur(14px); box-shadow: 0 24px 80px var(--shadow-1);
   padding: 14px;
-  display: flex;
-  flex-direction: column;
+  display: flex; flex-direction: column;
   gap: 10px;
+  max-height: calc(100vh - 64px);
+  overflow: auto;
 }
 
 .modal__title {
@@ -412,8 +449,8 @@ input {
   height: 34px;
   padding: 0 10px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  background: var(--surface-input);
   color: inherit;
   outline: none;
 }
@@ -443,14 +480,14 @@ input {
   height: 34px;
   padding: 0 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  background: var(--surface-input);
   color: inherit;
   cursor: pointer;
 }
 
 .btn:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--surface-hover);
 }
 
 .btn--primary {

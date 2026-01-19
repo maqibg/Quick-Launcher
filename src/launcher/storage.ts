@@ -1,6 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { LauncherState } from "./types";
-import { createDefaultState } from "./utils";
+import type { AppEntry, Group, LauncherState } from "./types";
+import { createDefaultState, createId, suggestAppName } from "./utils";
+import {
+  clampCardHeight,
+  clampCardIconScale,
+  clampCardWidth,
+  clampCardFontSize,
+  clampFontSize,
+  clampSidebarWidth,
+  normalizeTheme,
+} from "./uiSettings";
 
 const LEGACY_STORAGE_KEY = "launcher_state_v1";
 
@@ -8,35 +17,113 @@ function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-function isValidState(value: unknown): value is LauncherState {
-  if (!value || typeof value !== "object") return false;
-  const v = value as Partial<LauncherState>;
-  if (v.version !== 1) return false;
-  if (typeof v.activeGroupId !== "string") return false;
-  if (!Array.isArray(v.groups)) return false;
-  if (!v.settings || typeof v.settings !== "object") return false;
-  const settings = v.settings as any;
-  if (typeof settings.cardWidth !== "number") return false;
-  if (typeof settings.cardHeight !== "number") return false;
-  if (typeof settings.toggleHotkey !== "string") return false;
-  return v.groups.every((g) => {
-    if (!g || typeof g !== "object") return false;
-    const group = g as any;
-    if (typeof group.id !== "string") return false;
-    if (typeof group.name !== "string") return false;
-    if (!Array.isArray(group.apps)) return false;
-    return group.apps.every((a: any) => {
-      if (!a || typeof a !== "object") return false;
-      return (
-        typeof a.id === "string" &&
-        typeof a.name === "string" &&
-        typeof a.path === "string" &&
-        (typeof a.args === "undefined" || typeof a.args === "string" || a.args === null) &&
-        (typeof a.icon === "undefined" || typeof a.icon === "string" || a.icon === null) &&
-        typeof a.addedAt === "number"
-      );
-    });
-  });
+function coerceLauncherState(value: unknown): LauncherState | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as {
+    version?: unknown;
+    activeGroupId?: unknown;
+    groups?: unknown;
+    settings?: unknown;
+  };
+  if (raw.version !== 1) return null;
+
+  if (!Array.isArray(raw.groups)) return null;
+  const groups: Group[] = raw.groups
+    .map((g: unknown, idx: number): Group | null => {
+      if (!g || typeof g !== "object") return null;
+      const groupRaw = g as { id?: unknown; name?: unknown; apps?: unknown };
+      const id =
+        typeof groupRaw.id === "string" && groupRaw.id.trim()
+          ? groupRaw.id
+          : createId();
+      const name =
+        typeof groupRaw.name === "string" && groupRaw.name.trim()
+          ? groupRaw.name
+          : `Group-${idx + 1}`;
+      const appsRaw = Array.isArray(groupRaw.apps) ? groupRaw.apps : [];
+      const apps: AppEntry[] = appsRaw
+        .map((a: unknown): AppEntry | null => {
+          if (!a || typeof a !== "object") return null;
+          const appRaw = a as {
+            id?: unknown;
+            name?: unknown;
+            path?: unknown;
+            args?: unknown;
+            icon?: unknown;
+            addedAt?: unknown;
+          };
+          const path = typeof appRaw.path === "string" ? appRaw.path : "";
+          if (!path.trim()) return null;
+          const appId =
+            typeof appRaw.id === "string" && appRaw.id.trim()
+              ? appRaw.id
+              : createId();
+          const appName =
+            typeof appRaw.name === "string" && appRaw.name.trim()
+              ? appRaw.name
+              : suggestAppName(path);
+          const args = typeof appRaw.args === "string" ? appRaw.args : "";
+          const icon = typeof appRaw.icon === "string" ? appRaw.icon : undefined;
+          const addedAt =
+            typeof appRaw.addedAt === "number" && Number.isFinite(appRaw.addedAt)
+              ? appRaw.addedAt
+              : Date.now();
+          return { id: appId, name: appName, path, args, icon, addedAt };
+        })
+        .filter((x: AppEntry | null): x is AppEntry => x !== null);
+      return { id, name, apps };
+    })
+    .filter((x: Group | null): x is Group => x !== null);
+  if (groups.length === 0) return null;
+
+  const defaults = createDefaultState().settings;
+  const rawSettings =
+    raw.settings && typeof raw.settings === "object"
+      ? (raw.settings as Record<string, unknown>)
+      : {};
+  const settings = { ...defaults };
+
+  if (typeof rawSettings.cardWidth === "number") {
+    settings.cardWidth = clampCardWidth(rawSettings.cardWidth);
+  }
+  if (typeof rawSettings.cardHeight === "number") {
+    settings.cardHeight = clampCardHeight(rawSettings.cardHeight);
+  }
+  if (typeof rawSettings.toggleHotkey === "string") {
+    settings.toggleHotkey = rawSettings.toggleHotkey;
+  } else if (rawSettings.toggleHotkey === null) {
+    settings.toggleHotkey = "";
+  }
+  settings.theme = normalizeTheme(rawSettings.theme);
+
+  if (typeof rawSettings.sidebarWidth === "number") {
+    settings.sidebarWidth = clampSidebarWidth(rawSettings.sidebarWidth);
+  }
+  if (typeof rawSettings.fontFamily === "string" && rawSettings.fontFamily.trim()) {
+    settings.fontFamily = rawSettings.fontFamily.trim();
+  }
+  if (typeof rawSettings.fontSize === "number") {
+    settings.fontSize = clampFontSize(rawSettings.fontSize);
+  }
+  if (typeof rawSettings.cardFontSize === "number") {
+    settings.cardFontSize = clampCardFontSize(rawSettings.cardFontSize);
+  }
+  if (typeof rawSettings.cardIconScale === "number" && Number.isFinite(rawSettings.cardIconScale)) {
+    settings.cardIconScale = clampCardIconScale(rawSettings.cardIconScale, 128);
+  }
+
+  const activeGroupId =
+    typeof raw.activeGroupId === "string" &&
+    groups.some((g) => g.id === raw.activeGroupId)
+      ? raw.activeGroupId
+      : groups[0]?.id ?? createId();
+
+  return {
+    version: 1,
+    activeGroupId,
+    groups,
+    settings,
+  };
 }
 
 function loadLegacyState(): LauncherState | null {
@@ -44,11 +131,7 @@ function loadLegacyState(): LauncherState | null {
     const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
-    if (!isValidState(parsed)) return null;
-    if (!parsed.groups.some((g) => g.id === parsed.activeGroupId)) {
-      parsed.activeGroupId = parsed.groups[0]?.id ?? parsed.activeGroupId;
-    }
-    return parsed;
+    return coerceLauncherState(parsed);
   } catch {
     return null;
   }
@@ -58,7 +141,8 @@ export async function loadState(): Promise<LauncherState> {
   if (!isTauriRuntime()) return createDefaultState();
 
   const fromDb = (await invoke("load_launcher_state")) as unknown;
-  if (fromDb && isValidState(fromDb)) return fromDb;
+  const coerced = coerceLauncherState(fromDb);
+  if (coerced) return coerced;
 
   const legacy = loadLegacyState();
   if (legacy) {

@@ -6,6 +6,7 @@ import { createWindowControls } from "./windowControls";
 
 import { loadState, saveState } from "./storage";
 import type { AppEntry, Group, LauncherState } from "./types";
+import { createAppEditorModel } from "./appEditorModel";
 import {
   addAppsToGroup,
   createDefaultState,
@@ -13,15 +14,22 @@ import {
   normalizeDroppedPaths,
   parseArgs,
 } from "./utils";
+import {
+  applyLoadedUiSettings,
+  clampCardHeight,
+  clampCardIconScale,
+  clampCardWidth,
+  clampCardFontSize,
+  clampFontSize,
+  clampSidebarWidth,
+  computeAppStyle,
+  normalizeTheme,
+} from "./uiSettings";
 
 export type MenuKind = "blankMain" | "blankSidebar" | "app" | "group";
 
 function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 export function useLauncherModel() {
@@ -50,26 +58,14 @@ export function useLauncherModel() {
   });
 
   const appStyle = computed<Record<string, string>>(() => {
-    const width = clamp(state.settings.cardWidth, 80, 480);
-    const height = clamp(state.settings.cardHeight, 60, 360);
-    const iconBase = Math.min(width, height);
-    const icon = Math.round(iconBase * 0.35);
-    const iconImg = Math.round(icon * 0.72);
-    return {
-      "--card-min-width": `${width}px`,
-      "--card-height": `${height}px`,
-      "--card-icon-size": `${icon}px`,
-      "--card-icon-img-size": `${iconImg}px`,
-    };
+    return computeAppStyle(state.settings);
   });
 
   function applyLoadedState(loaded: LauncherState): void {
     state.version = loaded.version;
     state.activeGroupId = loaded.activeGroupId;
     state.groups.splice(0, state.groups.length, ...loaded.groups);
-    state.settings.cardWidth = loaded.settings.cardWidth;
-    state.settings.cardHeight = loaded.settings.cardHeight;
-    state.settings.toggleHotkey = loaded.settings.toggleHotkey;
+    applyLoadedUiSettings(state.settings, loaded.settings);
   }
 
   function showToast(message: string): void {
@@ -298,58 +294,12 @@ export function useLauncherModel() {
     scheduleSave();
   }
 
-  const editor = reactive<{
-    open: boolean;
-    entryId: string | null;
-    name: string;
-    path: string;
-    args: string;
-  }>({
-    open: false,
-    entryId: null,
-    name: "",
-    path: "",
-    args: "",
-  });
-
-  function openEditor(entry: AppEntry): void {
-    editor.open = true;
-    editor.entryId = entry.id;
-    editor.name = entry.name;
-    editor.path = entry.path;
-    editor.args = entry.args ?? "";
-  }
-
-  function closeEditor(): void {
-    editor.open = false;
-    editor.entryId = null;
-  }
-
-  function saveEditor(): void {
-    const group = activeGroup.value;
-    if (!group || !editor.entryId) return;
-    const entry = group.apps.find((a) => a.id === editor.entryId);
-    if (!entry) return;
-    entry.name = editor.name.trim() || entry.name;
-    const nextPath = editor.path.trim() || entry.path;
-    if (nextPath !== entry.path) {
-      entry.path = nextPath;
-      entry.icon = undefined;
-      hydrateEntryIcons([entry]);
-    } else {
-      entry.path = nextPath;
-    }
-    entry.args = editor.args;
-    closeEditor();
-    scheduleSave();
-  }
-
-  function applyEditorUpdate(payload: { name: string; path: string; args: string }): void {
-    editor.name = payload.name;
-    editor.path = payload.path;
-    editor.args = payload.args;
-    saveEditor();
-  }
+  const { editor, openEditor, closeEditor, applyEditorUpdate } =
+    createAppEditorModel({
+      getActiveGroup: () => activeGroup.value,
+      hydrateEntryIcons,
+      scheduleSave,
+    });
 
   function openSettings(): void {
     settingsOpen.value = true;
@@ -359,13 +309,59 @@ export function useLauncherModel() {
     settingsOpen.value = false;
   }
 
+  function clampIconScaleToCurrentCard(): void {
+    const width = clampCardWidth(state.settings.cardWidth);
+    const height = clampCardHeight(state.settings.cardHeight);
+    const iconMax = Math.min(width, height) * 0.82;
+    state.settings.cardIconScale = clampCardIconScale(
+      state.settings.cardIconScale,
+      iconMax,
+    );
+  }
+
   function updateCardWidth(value: number): void {
-    state.settings.cardWidth = clamp(Math.round(value), 80, 480);
+    state.settings.cardWidth = clampCardWidth(value);
+    clampIconScaleToCurrentCard();
     scheduleSave();
   }
 
   function updateCardHeight(value: number): void {
-    state.settings.cardHeight = clamp(Math.round(value), 60, 360);
+    state.settings.cardHeight = clampCardHeight(value);
+    clampIconScaleToCurrentCard();
+    scheduleSave();
+  }
+
+  function updateTheme(value: string): void {
+    state.settings.theme = normalizeTheme(value);
+    scheduleSave();
+  }
+
+  function updateSidebarWidth(value: number): void {
+    state.settings.sidebarWidth = clampSidebarWidth(value);
+    scheduleSave();
+  }
+
+  function updateFontFamily(value: string): void {
+    const next = value.trim();
+    state.settings.fontFamily = next || "system";
+    scheduleSave();
+  }
+
+  function updateFontSize(value: number): void {
+    state.settings.fontSize = clampFontSize(value);
+    scheduleSave();
+  }
+
+  function updateCardFontSize(value: number): void {
+    state.settings.cardFontSize = clampCardFontSize(value);
+    scheduleSave();
+  }
+
+  function updateCardIconScale(value: number): void {
+    const width = clampCardWidth(state.settings.cardWidth);
+    const height = clampCardHeight(state.settings.cardHeight);
+    const iconMax = Math.min(width, height) * 0.82;
+    state.settings.cardIconScale = clampCardIconScale(value, iconMax);
     scheduleSave();
   }
 
@@ -479,6 +475,12 @@ export function useLauncherModel() {
     closeSettings,
     updateCardWidth,
     updateCardHeight,
+    updateSidebarWidth,
+    updateFontFamily,
+    updateFontSize,
+    updateCardFontSize,
+    updateCardIconScale,
+    updateTheme,
     applyToggleHotkey,
   };
 }

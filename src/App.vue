@@ -39,6 +39,12 @@ const {
   closeSettings,
   updateCardWidth,
   updateCardHeight,
+  updateSidebarWidth,
+  updateFontFamily,
+  updateFontSize,
+  updateCardFontSize,
+  updateCardIconScale,
+  updateTheme,
   applyToggleHotkey,
 } = useLauncherModel();
 
@@ -60,7 +66,7 @@ function onGridApp(ev: MouseEvent, id: string): void {
 </script>
 
 <template>
-  <div class="app" :style="appStyle">
+  <div class="app" :style="appStyle" :data-theme="state.settings.theme">
     <TopBar
       title="Quick Launcher"
       v-model="search"
@@ -124,9 +130,21 @@ function onGridApp(ev: MouseEvent, id: string): void {
       :card-width="state.settings.cardWidth"
       :card-height="state.settings.cardHeight"
       :toggle-hotkey="state.settings.toggleHotkey"
+      :theme="state.settings.theme"
+      :sidebar-width="state.settings.sidebarWidth"
+      :font-family="state.settings.fontFamily"
+      :font-size="state.settings.fontSize"
+      :card-font-size="state.settings.cardFontSize"
+      :card-icon-scale="state.settings.cardIconScale"
       @close="closeSettings"
       @update-card-width="updateCardWidth"
       @update-card-height="updateCardHeight"
+      @update-theme="updateTheme"
+      @update-sidebar-width="updateSidebarWidth"
+      @update-font-family="updateFontFamily"
+      @update-font-size="updateFontSize"
+      @update-card-font-size="updateCardFontSize"
+      @update-card-icon-scale="updateCardIconScale"
       @apply-hotkey="applyToggleHotkey"
     />
   </div>

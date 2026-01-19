@@ -25,6 +25,12 @@ export function createDefaultState(): LauncherState {
     cardWidth: 120,
     cardHeight: 96,
     toggleHotkey: "",
+    theme: "dark",
+    sidebarWidth: 140,
+    fontFamily: "maye",
+    fontSize: 13,
+    cardFontSize: 11,
+    cardIconScale: 56,
   };
   const groups: Group[] = [
     { id: createId(), name: "Group-1", apps: [] },
