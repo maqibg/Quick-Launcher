@@ -1,14 +1,21 @@
 # my-quickstart
 
-一个快速启动工具
+a quick start tool
 
 ## Features
 
-- 技术栈: tauri + vue3 + sqlite
-- 左侧分组（Tab），右侧应用卡片，点击卡片启动应用
-- 支持右键空白处添加与文件拖拽导入
+- tech stack: tauri + vue3 + sqlite
+- left group（Tab），right application card，click card to start app
+- support right click to add app or drag app to add
 
 
-## 截图
+## screenshot
 
 ![alt text](image.png)
+
+## build
+Theoretically cross-platform, but currently only tested on Windows.
+```
+pnpm install
+pnpm tauri build
+```
