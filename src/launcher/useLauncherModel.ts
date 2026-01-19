@@ -7,6 +7,7 @@ import { loadState, saveState } from "./storage";
 import type { AppEntry, Group, LauncherState } from "./types";
 import { createAppEditorModel } from "./appEditorModel";
 import { createAddAppFlow, isUwpPath, UWP_PREFIX } from "./addAppFlow";
+import { createGroupRenameModel } from "./groupRenameModel";
 import {
   createDefaultState,
   createId,
@@ -131,12 +132,10 @@ export function useLauncherModel() {
     scheduleSave();
   }
 
-  function renameGroup(group: Group): void {
-    const next = window.prompt("Group name", group.name);
-    if (!next) return;
-    group.name = next.trim() || group.name;
-    scheduleSave();
-  }
+  const { rename, openRename, closeRename, saveRename } = createGroupRenameModel({
+    getGroupById: (id) => state.groups.find((g) => g.id === id),
+    scheduleSave,
+  });
 
   function removeGroup(group: Group): void {
     if (state.groups.length <= 1) return;
@@ -280,7 +279,7 @@ export function useLauncherModel() {
 
   function menuRenameGroup(): void {
     const group = getMenuGroup();
-    if (group) renameGroup(group);
+    if (group) openRename(group);
     closeMenu();
   }
 
@@ -456,15 +455,16 @@ export function useLauncherModel() {
   return {
     tauriRuntime, state, search, dragActive, toast,
     settingsOpen, addAppOpen, appStyle, filteredApps,
-    menu, editor, setActiveGroup, launch,
+    menu, editor, rename, setActiveGroup, launch,
     openMenu, closeMenu, menuAddApp, menuAddUwpApp, menuAddGroup,
     menuOpenApp, menuEditApp, menuRemoveApp, menuRenameGroup, menuRemoveGroup,
     pickAndAddApps, openAddApp, closeAddApp, addUwpToActiveGroup,
-    addGroup, renameGroup, removeGroup,
+    addGroup, removeGroup,
     minimizeWindow, toggleMaximizeWindow, closeWindow, startWindowDragging,
     closeEditor, applyEditorUpdate, openSettings, closeSettings,
     updateCardWidth, updateCardHeight, updateSidebarWidth, updateFontFamily, updateFontSize,
     updateCardFontSize, updateCardIconScale, updateTheme, updateDblClickBlankToHide,
     applyToggleHotkey, onMainBlankDoubleClick,
+    openRenameGroup: openRename, closeRenameGroup: closeRename, saveRenameGroup: saveRename,
   };
 }

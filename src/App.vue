@@ -6,6 +6,7 @@ import ContextMenu from "./components/ContextMenu.vue";
 import AppEditorModal from "./components/AppEditorModal.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import AddAppModal from "./components/AddAppModal.vue";
+import GroupRenameModal from "./components/GroupRenameModal.vue";
 import { useLauncherModel } from "./launcher/useLauncherModel";
 
 const {
@@ -20,6 +21,7 @@ const {
   filteredApps,
   menu,
   editor,
+  rename,
   setActiveGroup,
   launch,
   openMenu,
@@ -40,6 +42,8 @@ const {
   applyEditorUpdate,
   closeAddApp,
   addUwpToActiveGroup,
+  closeRenameGroup,
+  saveRenameGroup,
   openSettings,
   closeSettings,
   updateCardWidth,
@@ -136,6 +140,13 @@ function onGridBlankDblClick(): void {
       :args="editor.args"
       @close="closeEditor"
       @save="applyEditorUpdate"
+    />
+
+    <GroupRenameModal
+      :open="rename.open"
+      :name="rename.name"
+      @close="closeRenameGroup"
+      @save="saveRenameGroup"
     />
 
     <SettingsModal
