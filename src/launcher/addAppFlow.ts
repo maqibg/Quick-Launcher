@@ -71,7 +71,8 @@ export function createAddAppFlow(opts: {
       addedAt: Date.now(),
     };
     group.apps.unshift(entry);
-    opts.hydrateEntryIcons([entry]);
+    const added = group.apps.find((x) => x.id === entry.id);
+    if (added) opts.hydrateEntryIcons([added]);
     opts.showToast("Added 1 item(s)");
     opts.scheduleSave();
   }

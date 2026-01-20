@@ -77,7 +77,8 @@ export function addAppsToGroup(group: Group, filePaths: string[]): AppEntry[] {
   }
   if (toAdd.length === 0) return [];
   group.apps.unshift(...toAdd);
-  return toAdd;
+  const ids = new Set(toAdd.map((a) => a.id));
+  return group.apps.filter((a) => ids.has(a.id));
 }
 
 export function addAppsToGroupAt(group: Group, filePaths: string[], insertAt: number): AppEntry[] {
@@ -99,7 +100,8 @@ export function addAppsToGroupAt(group: Group, filePaths: string[], insertAt: nu
   if (toAdd.length === 0) return [];
   const idx = Math.max(0, Math.min(group.apps.length, Math.floor(insertAt)));
   group.apps.splice(idx, 0, ...toAdd);
-  return toAdd;
+  const ids = new Set(toAdd.map((a) => a.id));
+  return group.apps.filter((a) => ids.has(a.id));
 }
 
 export function parseArgs(args: string): string[] {
