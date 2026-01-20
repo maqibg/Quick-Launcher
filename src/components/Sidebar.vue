@@ -4,6 +4,7 @@ import type { Group } from "../launcher/types";
 type Props = {
   groups: Group[];
   activeGroupId: string;
+  dropTargetGroupId?: string | null;
 };
 
 defineProps<Props>();
@@ -13,6 +14,8 @@ const emit = defineEmits<{
   (e: "contextmenuBlank", ev: MouseEvent): void;
   (e: "contextmenuGroup", ev: MouseEvent, id: string): void;
   (e: "openSettings"): void;
+  (e: "externalDragOverGroup", ev: DragEvent, id: string): void;
+  (e: "externalDrop", ev: DragEvent): void;
 }>();
 </script>
 
@@ -23,10 +26,16 @@ const emit = defineEmits<{
         v-for="g in groups"
         :key="g.id"
         class="group"
-        :class="{ 'group--active': g.id === activeGroupId }"
+        :class="{
+          'group--active': g.id === activeGroupId,
+          'group--dropTarget': !!dropTargetGroupId && g.id === dropTargetGroupId,
+        }"
         type="button"
+        :data-group-id="g.id"
         @click="emit('selectGroup', g.id)"
         @contextmenu.stop="(e) => emit('contextmenuGroup', e, g.id)"
+        @dragover="(e) => emit('externalDragOverGroup', e, g.id)"
+        @drop.stop="(e) => emit('externalDrop', e)"
       >
         <span class="group__dot" />
         <span class="group__name" :title="g.name">{{ g.name }}</span>

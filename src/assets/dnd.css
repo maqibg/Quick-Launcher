@@ -1,0 +1,48 @@
+.card {
+  user-select: none;
+}
+
+.card--dragging {
+  opacity: 0.6;
+  transform: scale(0.98);
+  cursor: grabbing;
+}
+
+.cardPlaceholder {
+  height: var(--card-height);
+  border-radius: 14px;
+  border: 2px dashed rgba(86, 135, 255, 0.55);
+  background: rgba(86, 135, 255, 0.08);
+  box-sizing: border-box;
+}
+
+.card--dropBefore {
+  border-color: rgba(86, 135, 255, 0.7);
+  box-shadow: 0 -3px 0 0 rgba(86, 135, 255, 0.75) inset;
+}
+
+.grid__dropEnd {
+  grid-column: 1 / -1;
+  height: 0;
+  border-top: 3px solid rgba(86, 135, 255, 0.75);
+  border-radius: 2px;
+  margin: 4px 2px 0;
+  pointer-events: none;
+}
+
+.group--dropTarget {
+  background: rgba(86, 135, 255, 0.14);
+  border-color: rgba(86, 135, 255, 0.3);
+}
+
+.dragGhost {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  transform: translate(12px, 12px);
+}
+
+.dragGhost__card {
+  transition: none;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+}

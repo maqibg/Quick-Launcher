@@ -13,12 +13,15 @@ const {
   tauriRuntime,
   state,
   search,
-  dragActive,
   toast,
   settingsOpen,
   addAppOpen,
   appStyle,
   filteredApps,
+  draggingAppId,
+  dropBeforeAppId,
+  dropEnd,
+  dropTargetGroupId,
   menu,
   editor,
   rename,
@@ -34,6 +37,11 @@ const {
   menuRemoveApp,
   menuRenameGroup,
   menuRemoveGroup,
+  onMouseDownApp,
+  onExternalDragOverBlank,
+  onExternalDragOverApp,
+  onExternalDragOverGroup,
+  onExternalDrop,
   minimizeWindow,
   toggleMaximizeWindow,
   closeWindow,
@@ -96,23 +104,29 @@ function onGridBlankDblClick(): void {
       <Sidebar
         :groups="state.groups"
         :active-group-id="state.activeGroupId"
+        :drop-target-group-id="dropTargetGroupId"
         @select-group="setActiveGroup"
         @contextmenu-blank="onSidebarBlank"
         @contextmenu-group="onSidebarGroup"
+        @external-drag-over-group="onExternalDragOverGroup"
+        @external-drop="onExternalDrop"
         @open-settings="openSettings"
       />
 
       <AppGrid
         :apps="filteredApps"
+        :dragging-app-id="draggingAppId"
+        :drop-before-app-id="dropBeforeAppId"
+        :drop-end="dropEnd"
         @launch="launch"
         @contextmenu-blank="onGridBlank"
         @contextmenu-app="onGridApp"
         @dblclick-blank="onGridBlankDblClick"
+        @mouse-down-app="onMouseDownApp"
+        @external-drag-over-blank="onExternalDragOverBlank"
+        @external-drag-over-app="onExternalDragOverApp"
+        @external-drop="onExternalDrop"
       />
-    </div>
-
-    <div v-if="dragActive" class="dropOverlay">
-      <div class="dropOverlay__box">Drop to add</div>
     </div>
 
     <div v-if="toast" class="toast" role="status">{{ toast }}</div>

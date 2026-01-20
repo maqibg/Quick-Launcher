@@ -1,5 +1,4 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { createWindowControls } from "./windowControls";
 
@@ -8,11 +7,13 @@ import type { AppEntry, Group, LauncherState } from "./types";
 import { createAppEditorModel } from "./appEditorModel";
 import { createAddAppFlow, isUwpPath, UWP_PREFIX } from "./addAppFlow";
 import { createGroupRenameModel } from "./groupRenameModel";
+import { createExternalFileDropPreview } from "./externalFileDropPreview";
+import { createInternalCardDrag } from "./internalCardDrag";
 import { installSearchShortcuts } from "./searchShortcuts";
+import { installTauriFileDropListeners } from "./tauriFileDrop";
 import {
   createDefaultState,
   createId,
-  normalizeDroppedPaths,
   parseArgs,
 } from "./utils";
 import {
@@ -38,7 +39,6 @@ export function useLauncherModel() {
 
   const state = reactive<LauncherState>(createDefaultState());
   const search = ref("");
-  const dragActive = ref(false);
   const toast = ref<string | null>(null);
   const hydrated = ref(false);
   const settingsOpen = ref(false);
@@ -106,7 +106,6 @@ export function useLauncherModel() {
     openAddApp,
     closeAddApp,
     pickAndAddDesktopApps,
-    addPathsToActiveGroup,
     addUwpToActiveGroup,
   } = createAddAppFlow({
     tauriRuntime,
@@ -120,6 +119,7 @@ export function useLauncherModel() {
   const pickAndAddApps = pickAndAddDesktopApps;
 
   function setActiveGroup(id: string): void {
+    if (internalDrag.shouldSuppressClick()) return;
     state.activeGroupId = id;
   }
 
@@ -149,6 +149,7 @@ export function useLauncherModel() {
   }
 
   async function launch(entry: AppEntry): Promise<void> {
+    if (internalDrag.shouldSuppressClick()) return;
     if (!isTauriRuntime()) {
       showToast("This action requires the Tauri runtime");
       return;
@@ -290,6 +291,34 @@ export function useLauncherModel() {
     closeMenu();
   }
 
+  const internalDrag = createInternalCardDrag({
+    groups: state.groups,
+    getActiveGroup: () => activeGroup.value,
+    scheduleSave,
+    showToast,
+  });
+
+  const externalPreview = createExternalFileDropPreview({
+    getActiveGroup: () => activeGroup.value,
+  });
+
+  const draggingAppId = computed(() =>
+    internalDrag.state.dragging ? internalDrag.state.draggedAppId : null,
+  );
+  const dropBeforeAppId = computed(() =>
+    internalDrag.state.dragging
+      ? internalDrag.state.dropBeforeAppId
+      : externalPreview.state.dropBeforeAppId,
+  );
+  const dropEnd = computed(() =>
+    internalDrag.state.dragging ? internalDrag.state.dropEnd : externalPreview.state.dropEnd,
+  );
+  const dropTargetGroupId = computed(() =>
+    internalDrag.state.dragging
+      ? internalDrag.state.dropGroupId
+      : externalPreview.state.dropGroupId,
+  );
+
   function removeApp(entry: AppEntry): void {
     const group = activeGroup.value;
     if (!group) return;
@@ -397,7 +426,7 @@ export function useLauncherModel() {
     }
   }
 
-  let unlistenFns: UnlistenFn[] = [];
+  let unlistenFns: Array<() => void> = [];
   let uninstallSearchShortcuts: (() => void) | null = null;
 
   onMounted(async () => {
@@ -422,32 +451,15 @@ export function useLauncherModel() {
     hydrateEntryIcons(activeGroup.value?.apps ?? []);
 
     if (!isTauriRuntime()) return;
-
-    const drop = async (payload: unknown) => {
-      dragActive.value = false;
-      addPathsToActiveGroup(normalizeDroppedPaths(payload));
-    };
-    const hover = async () => {
-      dragActive.value = true;
-    };
-    const cancel = async () => {
-      dragActive.value = false;
-    };
-
-    const listeners: Array<Promise<UnlistenFn>> = [
-      listen("tauri://file-drop", (e) => drop(e.payload)),
-      listen("tauri://file-drop-hover", () => hover()),
-      listen("tauri://file-drop-cancelled", () => cancel()),
-      listen("tauri://drag-drop", (e) => drop(e.payload)),
-      listen("tauri://drag-enter", () => hover()),
-      listen("tauri://drag-leave", () => cancel()),
-    ];
-
-    unlistenFns = await Promise.allSettled(listeners).then((results) =>
-      results
-        .filter((r): r is PromiseFulfilledResult<UnlistenFn> => r.status === "fulfilled")
-        .map((r) => r.value),
-    );
+    unlistenFns = await installTauriFileDropListeners({
+      groups: state.groups,
+      getActiveGroup: () => activeGroup.value,
+      consumePending: externalPreview.consumePending,
+      clearPreview: externalPreview.clear,
+      hydrateEntryIcons,
+      scheduleSave,
+      showToast,
+    });
   });
 
   onUnmounted(() => {
@@ -455,12 +467,13 @@ export function useLauncherModel() {
     window.removeEventListener("blur", closeMenu);
     if (uninstallSearchShortcuts) uninstallSearchShortcuts();
     if (saveTimer) window.clearTimeout(saveTimer);
+    internalDrag.stopDrag();
     for (const unlisten of unlistenFns) unlisten();
     unlistenFns = [];
   });
 
   return {
-    tauriRuntime, state, search, dragActive, toast,
+    tauriRuntime, state, search, toast,
     settingsOpen, addAppOpen, appStyle, filteredApps,
     menu, editor, rename, setActiveGroup, launch,
     openMenu, closeMenu, menuAddApp, menuAddUwpApp, menuAddGroup,
@@ -473,5 +486,11 @@ export function useLauncherModel() {
     updateCardFontSize, updateCardIconScale, updateTheme, updateDblClickBlankToHide,
     applyToggleHotkey, onMainBlankDoubleClick,
     openRenameGroup: openRename, closeRenameGroup: closeRename, saveRenameGroup: saveRename,
+    draggingAppId, dropBeforeAppId, dropEnd, dropTargetGroupId,
+    onMouseDownApp: internalDrag.onMouseDownApp,
+    onExternalDragOverBlank: externalPreview.onDragOverBlank,
+    onExternalDragOverApp: externalPreview.onDragOverApp,
+    onExternalDragOverGroup: externalPreview.onDragOverGroup,
+    onExternalDrop: externalPreview.onDrop,
   };
 }

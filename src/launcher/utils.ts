@@ -80,6 +80,28 @@ export function addAppsToGroup(group: Group, filePaths: string[]): AppEntry[] {
   return toAdd;
 }
 
+export function addAppsToGroupAt(group: Group, filePaths: string[], insertAt: number): AppEntry[] {
+  const existing = new Set(group.apps.map((a) => a.path));
+  const now = Date.now();
+  const toAdd: AppEntry[] = [];
+  for (const p of filePaths) {
+    if (!p || existing.has(p)) continue;
+    toAdd.push({
+      id: createId(),
+      name: suggestAppName(p),
+      path: p,
+      args: "",
+      icon: undefined,
+      addedAt: now,
+    });
+    existing.add(p);
+  }
+  if (toAdd.length === 0) return [];
+  const idx = Math.max(0, Math.min(group.apps.length, Math.floor(insertAt)));
+  group.apps.splice(idx, 0, ...toAdd);
+  return toAdd;
+}
+
 export function parseArgs(args: string): string[] {
   const result: string[] = [];
   let current = "";
