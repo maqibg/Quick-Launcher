@@ -7,6 +7,12 @@ type Options = {
 
 export function createWindowControls(options: Options) {
   const { tauriRuntime, showToast } = options;
+  let pendingDrag:
+    | {
+        startX: number;
+        startY: number;
+      }
+    | null = null;
 
   async function minimizeWindow(): Promise<void> {
     if (!tauriRuntime) return;
@@ -44,8 +50,27 @@ export function createWindowControls(options: Options) {
   async function startWindowDragging(ev: MouseEvent): Promise<void> {
     if (!tauriRuntime) return;
     if (ev.button !== 0) return;
+    if (ev.detail > 1) return;
     const target = ev.target as HTMLElement | null;
     if (target?.closest("input, button, textarea, select, a")) return;
+    pendingDrag = { startX: ev.clientX, startY: ev.clientY };
+    window.addEventListener("mousemove", onDragMove, true);
+    window.addEventListener("mouseup", stopPendingDrag, true);
+    ev.preventDefault();
+  }
+
+  function stopPendingDrag(): void {
+    pendingDrag = null;
+    window.removeEventListener("mousemove", onDragMove, true);
+    window.removeEventListener("mouseup", stopPendingDrag, true);
+  }
+
+  async function onDragMove(ev: MouseEvent): Promise<void> {
+    if (!pendingDrag) return;
+    const dx = ev.clientX - pendingDrag.startX;
+    const dy = ev.clientY - pendingDrag.startY;
+    if (dx * dx + dy * dy < 16) return;
+    stopPendingDrag();
     try {
       await getCurrentWindow().startDragging();
     } catch (e) {
@@ -53,6 +78,7 @@ export function createWindowControls(options: Options) {
         `Drag failed: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+    ev.preventDefault();
   }
 
   async function setAlwaysOnTop(value: boolean): Promise<void> {

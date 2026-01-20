@@ -21,9 +21,9 @@ function onInput(ev: Event): void {
 </script>
 
 <template>
-  <header class="topbar" data-tauri-drag-region @mousedown="(e) => emit('startDragging', e)">
-    <div class="topbar__drag" data-tauri-drag-region @dblclick="emit('toggleMaximize')">
-      <div class="topbar__title" data-tauri-drag-region>{{ title }}</div>
+  <header class="topbar" @mousedown="(e) => emit('startDragging', e)">
+    <div class="topbar__drag" @dblclick="emit('toggleMaximize')">
+      <div class="topbar__title">{{ title }}</div>
     </div>
 
     <div class="topbar__right">
@@ -48,4 +48,3 @@ function onInput(ev: Event): void {
     </div>
   </header>
 </template>
-
