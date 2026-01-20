@@ -24,7 +24,11 @@ export function moveAppByDragPayload(
   const insertBase = typeof toIndex === "number" ? toIndex : toGroup.apps.length;
   const maxIndex = toGroup.apps.length;
   let insertAt = Math.max(0, Math.min(maxIndex, Math.floor(insertBase)));
-  if (fromGroup.id === toGroup.id && fromIndex < insertAt) {
+  if (
+    fromGroup.id === toGroup.id &&
+    fromIndex < insertAt &&
+    insertAt !== toGroup.apps.length
+  ) {
     insertAt = Math.max(0, insertAt - 1);
   }
 
