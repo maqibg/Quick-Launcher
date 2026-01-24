@@ -116,6 +116,20 @@ export function useLauncherModel() {
       await hydrateEntryIcons(entries);
     },
     scheduleSave,
+    transformPaths: async (paths) => {
+      if (!tauriRuntime || !state.settings.useRelativePath) return paths;
+      const mapped = await Promise.all(
+        paths.map(async (p) => {
+          try {
+            const v = (await invoke("make_relative_path", { path: p })) as unknown;
+            return typeof v === "string" && v.trim() ? v : p;
+          } catch {
+            return p;
+          }
+        }),
+      );
+      return mapped;
+    },
   });
   const pickAndAddApps = pickAndAddDesktopApps;
 
@@ -380,6 +394,11 @@ export function useLauncherModel() {
     scheduleSave();
   }
 
+  function updateUseRelativePath(value: boolean): void {
+    state.settings.useRelativePath = value;
+    scheduleSave();
+  }
+
   function updateHideOnStartup(value: boolean): void {
     state.settings.hideOnStartup = value;
     scheduleSave();
@@ -468,6 +487,20 @@ export function useLauncherModel() {
       hydrateEntryIcons,
       scheduleSave,
       showToast,
+      transformPaths: async (paths) => {
+        if (!state.settings.useRelativePath) return paths;
+        const mapped = await Promise.all(
+          paths.map(async (p) => {
+            try {
+              const v = (await invoke("make_relative_path", { path: p })) as unknown;
+              return typeof v === "string" && v.trim() ? v : p;
+            } catch {
+              return p;
+            }
+          }),
+        );
+        return mapped;
+      },
     });
   });
 
@@ -493,7 +526,7 @@ export function useLauncherModel() {
     closeEditor, applyEditorUpdate, openSettings, closeSettings,
     updateCardWidth, updateCardHeight, updateSidebarWidth, updateFontFamily, updateFontSize,
     updateCardFontSize, updateCardIconScale, updateTheme, updateDblClickBlankToHide,
-    updateAlwaysOnTop, updateHideOnStartup, applyToggleHotkey, onMainBlankDoubleClick,
+    updateAlwaysOnTop, updateHideOnStartup, updateUseRelativePath, applyToggleHotkey, onMainBlankDoubleClick,
     openRenameGroup: openRename, closeRenameGroup: closeRename, saveRenameGroup: saveRename,
     draggingAppId, dropBeforeAppId, dropEnd, dropTargetGroupId,
     onMouseDownApp: internalDrag.onMouseDownApp,

@@ -34,6 +34,7 @@ export function createDefaultState(): LauncherState {
     dblClickBlankToHide: true,
     alwaysOnTop: true,
     hideOnStartup: false,
+    useRelativePath: false,
   };
   const groups: Group[] = [
     { id: createId(), name: "Group-1", apps: [] },

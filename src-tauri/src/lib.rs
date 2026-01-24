@@ -1,7 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::{Path, PathBuf}};
 use tauri::Manager;
 
 mod icon;
@@ -17,24 +17,25 @@ fn greet(name: &str) -> String {
 
 #[tauri::command]
 fn spawn_app(path: String, args: Vec<String>) -> Result<(), String> {
+    let resolved_path = resolve_launch_path(&path);
     if args.is_empty() {
         #[cfg(target_os = "windows")]
         {
             std::process::Command::new("explorer")
-                .arg(path)
+                .arg(resolved_path)
                 .spawn()
                 .map(|_| ())
                 .map_err(|e| e.to_string())
         }
         #[cfg(not(target_os = "windows"))]
         {
-            std::process::Command::new(path)
+            std::process::Command::new(resolved_path)
                 .spawn()
                 .map(|_| ())
                 .map_err(|e| e.to_string())
         }
     } else {
-        std::process::Command::new(path)
+        std::process::Command::new(resolved_path)
             .args(args)
             .spawn()
             .map(|_| ())
@@ -83,6 +84,8 @@ struct UiSettings {
     dbl_click_blank_to_hide: bool,
     #[serde(rename = "hideOnStartup", default = "default_hide_on_startup")]
     hide_on_startup: bool,
+    #[serde(rename = "useRelativePath", default = "default_use_relative_path")]
+    use_relative_path: bool,
 }
 
 fn default_card_height() -> u32 {
@@ -121,6 +124,10 @@ fn default_hide_on_startup() -> bool {
     false
 }
 
+fn default_use_relative_path() -> bool {
+    false
+}
+
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
@@ -135,8 +142,83 @@ impl Default for UiSettings {
             card_icon_scale: default_card_icon_scale(),
             dbl_click_blank_to_hide: default_dbl_click_blank_to_hide(),
             hide_on_startup: default_hide_on_startup(),
+            use_relative_path: default_use_relative_path(),
         }
     }
+}
+
+fn is_special_path(path: &str) -> bool {
+    let lower = path.trim().to_ascii_lowercase();
+    lower.starts_with("shell:") || lower.starts_with("uwp:")
+}
+
+fn app_base_dir() -> Option<PathBuf> {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+}
+
+fn make_relative_path_inner(path: &Path, base: &Path) -> Option<PathBuf> {
+    let path_components: Vec<_> = path.components().collect();
+    let base_components: Vec<_> = base.components().collect();
+    if path_components.is_empty() || base_components.is_empty() {
+        return None;
+    }
+    if let (Some(std::path::Component::Prefix(p1)), Some(std::path::Component::Prefix(p2))) =
+        (path_components.first(), base_components.first())
+    {
+        if p1.kind() != p2.kind() {
+            return None;
+        }
+    }
+
+    let mut idx = 0usize;
+    while idx < path_components.len()
+        && idx < base_components.len()
+        && path_components[idx] == base_components[idx]
+    {
+        idx += 1;
+    }
+
+    let mut rel = PathBuf::new();
+    for _ in idx..base_components.len() {
+        rel.push("..");
+    }
+    for comp in &path_components[idx..] {
+        rel.push(comp.as_os_str());
+    }
+    if rel.as_os_str().is_empty() {
+        rel.push(".");
+    }
+    Some(rel)
+}
+
+fn resolve_launch_path(path: &str) -> String {
+    if path.trim().is_empty() || is_special_path(path) {
+        return path.to_string();
+    }
+    let p = Path::new(path);
+    if p.is_absolute() {
+        return path.to_string();
+    }
+    if let Some(base) = app_base_dir() {
+        return base.join(p).to_string_lossy().to_string();
+    }
+    path.to_string()
+}
+
+#[tauri::command]
+fn make_relative_path(path: String) -> Result<String, String> {
+    if path.trim().is_empty() || is_special_path(&path) {
+        return Ok(path);
+    }
+    let base = app_base_dir().ok_or_else(|| "base dir not found".to_string())?;
+    let p = Path::new(&path);
+    if !p.is_absolute() {
+        return Ok(path);
+    }
+    let rel = make_relative_path_inner(p, &base).unwrap_or_else(|| p.to_path_buf());
+    Ok(rel.to_string_lossy().to_string())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -494,6 +576,7 @@ pub fn run() {
             uwp::spawn_uwp_app,
             icon::get_file_icon,
             set_toggle_hotkey,
+            make_relative_path,
             load_launcher_state,
             save_launcher_state
         ])

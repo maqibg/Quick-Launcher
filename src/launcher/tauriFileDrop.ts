@@ -12,6 +12,7 @@ export async function installTauriFileDropListeners(opts: {
   hydrateEntryIcons: (entries: AppEntry[]) => Promise<void>;
   scheduleSave: () => void;
   showToast: (message: string) => void;
+  transformPaths?: (paths: string[]) => Promise<string[]>;
 }): Promise<UnlistenFn[]> {
   const drop = async (payload: unknown) => {
     opts.clearPreview();
@@ -26,7 +27,8 @@ export async function installTauriFileDropListeners(opts: {
     const idxBase =
       pending?.index ??
       (typeof fallback?.index === "number" ? fallback.index : group.apps.length);
-    const added = addAppsToGroupAt(group, paths, idxBase);
+    const normalized = opts.transformPaths ? await opts.transformPaths(paths) : paths;
+    const added = addAppsToGroupAt(group, normalized, idxBase);
     if (added.length > 0) {
       opts.showToast(`Added ${added.length} item(s)`);
       await opts.hydrateEntryIcons(added);
@@ -51,4 +53,3 @@ export async function installTauriFileDropListeners(opts: {
       .map((r) => r.value),
   );
 }
-

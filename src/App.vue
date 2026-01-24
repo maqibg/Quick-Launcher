@@ -65,6 +65,7 @@ const {
   updateDblClickBlankToHide,
   updateAlwaysOnTop,
   updateHideOnStartup,
+  updateUseRelativePath,
   applyToggleHotkey,
   onMainBlankDoubleClick,
 } = useLauncherModel();
@@ -179,6 +180,7 @@ function onGridBlankDblClick(): void {
       :dblclick-blank-to-hide="state.settings.dblClickBlankToHide"
       :always-on-top="state.settings.alwaysOnTop"
       :hide-on-startup="state.settings.hideOnStartup"
+      :use-relative-path="state.settings.useRelativePath"
       @close="closeSettings"
       @update-card-width="updateCardWidth"
       @update-card-height="updateCardHeight"
@@ -191,6 +193,7 @@ function onGridBlankDblClick(): void {
       @update-dblclick-blank-to-hide="updateDblClickBlankToHide"
       @update-always-on-top="updateAlwaysOnTop"
       @update-hide-on-startup="updateHideOnStartup"
+      @update-use-relative-path="updateUseRelativePath"
       @apply-hotkey="applyToggleHotkey"
     />
 

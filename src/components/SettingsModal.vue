@@ -16,6 +16,7 @@ type Props = {
   dblclickBlankToHide: boolean;
   alwaysOnTop: boolean;
   hideOnStartup: boolean;
+  useRelativePath: boolean;
 };
 
 const props = defineProps<Props>();
@@ -34,6 +35,7 @@ const emit = defineEmits<{
   (e: "updateDblclickBlankToHide", value: boolean): void;
   (e: "updateAlwaysOnTop", value: boolean): void;
   (e: "updateHideOnStartup", value: boolean): void;
+  (e: "updateUseRelativePath", value: boolean): void;
 }>();
 
 const cardWidth = ref(120);
@@ -48,6 +50,7 @@ const cardIconScale = ref(48);
 const dblclickBlankToHide = ref(true);
 const alwaysOnTop = ref(true);
 const hideOnStartup = ref(false);
+const useRelativePath = ref(false);
 const panelEl = ref<HTMLElement | null>(null);
 const panelX = ref(0);
 const panelY = ref(0);
@@ -155,6 +158,7 @@ watch(
     dblclickBlankToHide.value = props.dblclickBlankToHide;
     alwaysOnTop.value = props.alwaysOnTop;
     hideOnStartup.value = props.hideOnStartup;
+    useRelativePath.value = props.useRelativePath;
   },
   { immediate: true },
 );
@@ -235,6 +239,12 @@ function onHideOnStartupChange(ev: Event): void {
   const next = (ev.target as HTMLInputElement).checked;
   hideOnStartup.value = next;
   emit("updateHideOnStartup", next);
+}
+
+function onUseRelativePathChange(ev: Event): void {
+  const next = (ev.target as HTMLInputElement).checked;
+  useRelativePath.value = next;
+  emit("updateUseRelativePath", next);
 }
 
 function onApplyHotkey(): void {
@@ -420,6 +430,16 @@ function onApplyHotkey(): void {
             @change="onHideOnStartupChange"
           />
           <span class="check__label">Hide window on startup</span>
+        </label>
+
+        <label class="check">
+          <input
+            class="check__input"
+            type="checkbox"
+            :checked="useRelativePath"
+            @change="onUseRelativePathChange"
+          />
+          <span class="check__label">Use relative paths when adding apps</span>
         </label>
       </template>
 

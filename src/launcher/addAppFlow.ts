@@ -17,6 +17,7 @@ export function createAddAppFlow(opts: {
   showToast: (message: string) => void;
   hydrateEntryIcons: (entries: AppEntry[]) => Promise<void>;
   scheduleSave: () => void;
+  transformPaths?: (paths: string[]) => Promise<string[]>;
 }) {
   const open = ref(false);
 
@@ -28,10 +29,11 @@ export function createAddAppFlow(opts: {
     open.value = false;
   }
 
-  function addPathsToActiveGroup(paths: string[]): void {
+  async function addPathsToActiveGroup(paths: string[]): Promise<void> {
     const group = opts.getActiveGroup();
     if (!group) return;
-    const added = addAppsToGroup(group, paths);
+    const normalized = opts.transformPaths ? await opts.transformPaths(paths) : paths;
+    const added = addAppsToGroup(group, normalized);
     if (added.length > 0) {
       opts.showToast(`Added ${added.length} item(s)`);
       opts.hydrateEntryIcons(added);
@@ -51,7 +53,7 @@ export function createAddAppFlow(opts: {
     });
     if (!selection) return;
     const paths = Array.isArray(selection) ? selection : [selection];
-    addPathsToActiveGroup(paths);
+    await addPathsToActiveGroup(paths);
   }
 
   function addUwpToActiveGroup(app: UwpAppInfo): void {

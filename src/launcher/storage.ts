@@ -120,6 +120,9 @@ function coerceLauncherState(value: unknown): LauncherState | null {
   if (typeof rawSettings.hideOnStartup === "boolean") {
     settings.hideOnStartup = rawSettings.hideOnStartup;
   }
+  if (typeof rawSettings.useRelativePath === "boolean") {
+    settings.useRelativePath = rawSettings.useRelativePath;
+  }
 
   const activeGroupId =
     typeof raw.activeGroupId === "string" &&

@@ -66,6 +66,9 @@ export function applyLoadedUiSettings(target: UiSettings, loaded: UiSettings): v
 
   const maybeHideOnStartup = (loaded as any).hideOnStartup;
   if (typeof maybeHideOnStartup === "boolean") target.hideOnStartup = maybeHideOnStartup;
+
+  const maybeRelativePath = (loaded as any).useRelativePath;
+  if (typeof maybeRelativePath === "boolean") target.useRelativePath = maybeRelativePath;
 }
 
 export function computeAppStyle(settings: UiSettings): Record<string, string> {

@@ -26,6 +26,7 @@ export type UiSettings = {
   dblClickBlankToHide: boolean;
   alwaysOnTop: boolean;
   hideOnStartup: boolean;
+  useRelativePath: boolean;
 };
 
 export type LauncherState = {
