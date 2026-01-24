@@ -15,6 +15,7 @@ type Props = {
   cardIconScale: number;
   dblclickBlankToHide: boolean;
   alwaysOnTop: boolean;
+  hideOnStartup: boolean;
 };
 
 const props = defineProps<Props>();
@@ -32,6 +33,7 @@ const emit = defineEmits<{
   (e: "updateCardIconScale", value: number): void;
   (e: "updateDblclickBlankToHide", value: boolean): void;
   (e: "updateAlwaysOnTop", value: boolean): void;
+  (e: "updateHideOnStartup", value: boolean): void;
 }>();
 
 const cardWidth = ref(120);
@@ -45,6 +47,7 @@ const cardFontSize = ref(12);
 const cardIconScale = ref(48);
 const dblclickBlankToHide = ref(true);
 const alwaysOnTop = ref(true);
+const hideOnStartup = ref(false);
 const panelEl = ref<HTMLElement | null>(null);
 const panelX = ref(0);
 const panelY = ref(0);
@@ -151,6 +154,7 @@ watch(
     cardIconScale.value = props.cardIconScale;
     dblclickBlankToHide.value = props.dblclickBlankToHide;
     alwaysOnTop.value = props.alwaysOnTop;
+    hideOnStartup.value = props.hideOnStartup;
   },
   { immediate: true },
 );
@@ -225,6 +229,12 @@ function onAlwaysOnTopChange(ev: Event): void {
   const next = (ev.target as HTMLInputElement).checked;
   alwaysOnTop.value = next;
   emit("updateAlwaysOnTop", next);
+}
+
+function onHideOnStartupChange(ev: Event): void {
+  const next = (ev.target as HTMLInputElement).checked;
+  hideOnStartup.value = next;
+  emit("updateHideOnStartup", next);
 }
 
 function onApplyHotkey(): void {
@@ -400,6 +410,16 @@ function onApplyHotkey(): void {
             @change="onAlwaysOnTopChange"
           />
           <span class="check__label">Always on top</span>
+        </label>
+
+        <label class="check">
+          <input
+            class="check__input"
+            type="checkbox"
+            :checked="hideOnStartup"
+            @change="onHideOnStartupChange"
+          />
+          <span class="check__label">Hide window on startup</span>
         </label>
       </template>
 

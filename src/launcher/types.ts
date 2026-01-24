@@ -25,6 +25,7 @@ export type UiSettings = {
   cardIconScale: number;
   dblClickBlankToHide: boolean;
   alwaysOnTop: boolean;
+  hideOnStartup: boolean;
 };
 
 export type LauncherState = {

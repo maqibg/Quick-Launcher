@@ -380,6 +380,11 @@ export function useLauncherModel() {
     scheduleSave();
   }
 
+  function updateHideOnStartup(value: boolean): void {
+    state.settings.hideOnStartup = value;
+    scheduleSave();
+  }
+
   function onMainBlankDoubleClick(): void {
     if (!state.settings.dblClickBlankToHide) return;
     closeWindow();
@@ -488,7 +493,7 @@ export function useLauncherModel() {
     closeEditor, applyEditorUpdate, openSettings, closeSettings,
     updateCardWidth, updateCardHeight, updateSidebarWidth, updateFontFamily, updateFontSize,
     updateCardFontSize, updateCardIconScale, updateTheme, updateDblClickBlankToHide,
-    updateAlwaysOnTop, applyToggleHotkey, onMainBlankDoubleClick,
+    updateAlwaysOnTop, updateHideOnStartup, applyToggleHotkey, onMainBlankDoubleClick,
     openRenameGroup: openRename, closeRenameGroup: closeRename, saveRenameGroup: saveRename,
     draggingAppId, dropBeforeAppId, dropEnd, dropTargetGroupId,
     onMouseDownApp: internalDrag.onMouseDownApp,

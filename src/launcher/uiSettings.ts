@@ -63,6 +63,9 @@ export function applyLoadedUiSettings(target: UiSettings, loaded: UiSettings): v
 
   const maybeAlwaysOnTop = (loaded as any).alwaysOnTop;
   if (typeof maybeAlwaysOnTop === "boolean") target.alwaysOnTop = maybeAlwaysOnTop;
+
+  const maybeHideOnStartup = (loaded as any).hideOnStartup;
+  if (typeof maybeHideOnStartup === "boolean") target.hideOnStartup = maybeHideOnStartup;
 }
 
 export function computeAppStyle(settings: UiSettings): Record<string, string> {

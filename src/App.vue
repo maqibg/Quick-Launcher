@@ -64,6 +64,7 @@ const {
   updateTheme,
   updateDblClickBlankToHide,
   updateAlwaysOnTop,
+  updateHideOnStartup,
   applyToggleHotkey,
   onMainBlankDoubleClick,
 } = useLauncherModel();
@@ -177,6 +178,7 @@ function onGridBlankDblClick(): void {
       :card-icon-scale="state.settings.cardIconScale"
       :dblclick-blank-to-hide="state.settings.dblClickBlankToHide"
       :always-on-top="state.settings.alwaysOnTop"
+      :hide-on-startup="state.settings.hideOnStartup"
       @close="closeSettings"
       @update-card-width="updateCardWidth"
       @update-card-height="updateCardHeight"
@@ -188,6 +190,7 @@ function onGridBlankDblClick(): void {
       @update-card-icon-scale="updateCardIconScale"
       @update-dblclick-blank-to-hide="updateDblClickBlankToHide"
       @update-always-on-top="updateAlwaysOnTop"
+      @update-hide-on-startup="updateHideOnStartup"
       @apply-hotkey="applyToggleHotkey"
     />
 

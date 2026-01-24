@@ -81,6 +81,8 @@ struct UiSettings {
         default = "default_dbl_click_blank_to_hide"
     )]
     dbl_click_blank_to_hide: bool,
+    #[serde(rename = "hideOnStartup", default = "default_hide_on_startup")]
+    hide_on_startup: bool,
 }
 
 fn default_card_height() -> u32 {
@@ -115,6 +117,10 @@ fn default_dbl_click_blank_to_hide() -> bool {
     true
 }
 
+fn default_hide_on_startup() -> bool {
+    false
+}
+
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
@@ -128,6 +134,7 @@ impl Default for UiSettings {
             card_font_size: default_card_font_size(),
             card_icon_scale: default_card_icon_scale(),
             dbl_click_blank_to_hide: default_dbl_click_blank_to_hide(),
+            hide_on_startup: default_hide_on_startup(),
         }
     }
 }
@@ -460,6 +467,14 @@ pub fn run() {
                 let saved = load_saved_hotkey(&app.handle());
                 if let Some(state) = app.try_state::<hotkey::HotkeyState>() {
                     hotkey::init_from_saved_hotkey(&app.handle(), &state, saved);
+                }
+            }
+            if let Ok(conn) = open_db(&app.handle()) {
+                let settings = load_ui_settings(&conn);
+                if settings.hide_on_startup {
+                    if let Some(w) = app.get_webview_window("main") {
+                        let _ = w.hide();
+                    }
                 }
             }
             Ok(())

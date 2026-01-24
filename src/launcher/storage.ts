@@ -117,6 +117,9 @@ function coerceLauncherState(value: unknown): LauncherState | null {
   if (typeof rawSettings.alwaysOnTop === "boolean") {
     settings.alwaysOnTop = rawSettings.alwaysOnTop;
   }
+  if (typeof rawSettings.hideOnStartup === "boolean") {
+    settings.hideOnStartup = rawSettings.hideOnStartup;
+  }
 
   const activeGroupId =
     typeof raw.activeGroupId === "string" &&
