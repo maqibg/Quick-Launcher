@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, reactive } from "vue";
+import { onUnmounted, reactive } from "vue";
 import type { AppEntry } from "../launcher/types";
 import { t } from "../launcher/i18n";
 
@@ -9,9 +9,20 @@ type Props = {
   draggingAppId?: string | null;
   dropBeforeAppId?: string | null;
   dropEnd?: boolean;
+  observeIcon?: (el: HTMLElement, appId: string) => void;
+  unobserveIcon?: (el: HTMLElement) => void;
 };
 
 const props = defineProps<Props>();
+
+const vLazyIcon = {
+  mounted(el: HTMLElement, binding: any) {
+    props.observeIcon?.(el, binding.value);
+  },
+  unmounted(el: HTMLElement) {
+    props.unobserveIcon?.(el);
+  },
+};
 
 const emit = defineEmits<{
   (e: "launch", entry: AppEntry): void;
@@ -24,16 +35,14 @@ const emit = defineEmits<{
   (e: "externalDrop", ev: DragEvent): void;
 }>();
 
-type RenderItem =
-  | { kind: "placeholder"; key: string }
-  | { kind: "app"; key: string; app: AppEntry };
-
 const ghost = reactive<{
   active: boolean;
   startX: number;
   startY: number;
   x: number;
   y: number;
+  offsetX: number;
+  offsetY: number;
   app: AppEntry | null;
 }>({
   active: false,
@@ -41,18 +50,40 @@ const ghost = reactive<{
   startY: 0,
   x: 0,
   y: 0,
+  offsetX: 0,
+  offsetY: 0,
   app: null,
 });
+
+let nextGhostX = 0;
+let nextGhostY = 0;
+let ghostFrame: number | null = null;
+
+function applyGhostPosition(): void {
+  ghost.x = nextGhostX;
+  ghost.y = nextGhostY;
+  ghostFrame = null;
+}
+
+function scheduleGhostPosition(x: number, y: number): void {
+  nextGhostX = x;
+  nextGhostY = y;
+  if (ghostFrame != null) return;
+  ghostFrame = window.requestAnimationFrame(applyGhostPosition);
+}
 
 function onGhostMove(ev: MouseEvent): void {
   const dx = ev.clientX - ghost.startX;
   const dy = ev.clientY - ghost.startY;
   if (!ghost.active && dx * dx + dy * dy >= 16) ghost.active = true;
-  ghost.x = ev.clientX;
-  ghost.y = ev.clientY;
+  scheduleGhostPosition(ev.clientX, ev.clientY);
 }
 
 function onGhostUp(): void {
+  if (ghostFrame != null) {
+    window.cancelAnimationFrame(ghostFrame);
+    ghostFrame = null;
+  }
   ghost.active = false;
   ghost.app = null;
   window.removeEventListener("mousemove", onGhostMove, true);
@@ -62,10 +93,21 @@ function onGhostUp(): void {
 function onMouseDownApp(ev: MouseEvent, id: string): void {
   if (props.dragEnabled === false) return;
   const entry = props.apps.find((a) => a.id === id) ?? null;
+  const cardEl = ev.currentTarget instanceof HTMLElement ? ev.currentTarget : null;
+  if (cardEl) {
+    const rect = cardEl.getBoundingClientRect();
+    ghost.offsetX = Math.max(0, ev.clientX - rect.left);
+    ghost.offsetY = Math.max(0, ev.clientY - rect.top);
+  } else {
+    ghost.offsetX = 0;
+    ghost.offsetY = 0;
+  }
   ghost.startX = ev.clientX;
   ghost.startY = ev.clientY;
   ghost.x = ev.clientX;
   ghost.y = ev.clientY;
+  nextGhostX = ev.clientX;
+  nextGhostY = ev.clientY;
   ghost.app = entry;
   ghost.active = false;
   window.addEventListener("mousemove", onGhostMove, true);
@@ -75,34 +117,6 @@ function onMouseDownApp(ev: MouseEvent, id: string): void {
 
 onUnmounted(() => {
   onGhostUp();
-});
-
-const renderItems = computed<RenderItem[]>(() => {
-  const draggingId = props.draggingAppId ?? null;
-  const items: RenderItem[] = [];
-  if (!draggingId) {
-    for (const app of props.apps) items.push({ kind: "app", key: app.id, app });
-    return items;
-  }
-
-  const apps = props.apps.filter((a) => a.id !== draggingId);
-  const hasTarget = !!props.dropBeforeAppId || !!props.dropEnd;
-  let insertAt = apps.length;
-  if (hasTarget && props.dropBeforeAppId) {
-    const idx = apps.findIndex((a) => a.id === props.dropBeforeAppId);
-    if (idx >= 0) insertAt = idx;
-  } else if (hasTarget && props.dropEnd) {
-    insertAt = apps.length;
-  }
-
-  const bounded = Math.max(0, Math.min(apps.length, insertAt));
-  for (let i = 0; i < apps.length; i++) {
-    if (hasTarget && i === bounded) items.push({ kind: "placeholder", key: "__placeholder__" });
-    const app = apps[i]!;
-    items.push({ kind: "app", key: app.id, app });
-  }
-  if (hasTarget && bounded === apps.length) items.push({ kind: "placeholder", key: "__placeholder__" });
-  return items;
 });
 
 function onDblClick(ev: MouseEvent): void {
@@ -124,38 +138,35 @@ function onDblClick(ev: MouseEvent): void {
       @drop.stop="(e) => emit('externalDrop', e)"
     >
       <div
-        v-for="item in renderItems"
-        :key="item.key"
+        v-for="item in props.apps"
+        :key="item.id"
+        v-lazy-icon="item.id"
+        class="card"
+        :class="{
+          'card--dropBefore': !!props.dropBeforeAppId && item.id === props.dropBeforeAppId,
+          'card--sourceDragging': !!props.draggingAppId && item.id === props.draggingAppId,
+        }"
+        role="button"
+        tabindex="0"
+        :data-app-id="item.id"
+        @click="emit('launch', item)"
+        @keydown.enter.prevent="emit('launch', item)"
+        @keydown.space.prevent="emit('launch', item)"
+        @contextmenu.stop="(e) => emit('contextmenuApp', e, item.id)"
+        @mousedown.stop="(e) => onMouseDownApp(e, item.id)"
+        @dragover="(e) => emit('externalDragOverApp', e, item.id)"
+        @drop.stop="(e) => emit('externalDrop', e)"
       >
-        <div v-if="item.kind === 'placeholder'" class="cardPlaceholder" aria-hidden="true" />
-        <div
-          v-else
-          class="card"
-          :class="{
-            'card--dropBefore': !!props.dropBeforeAppId && item.app.id === props.dropBeforeAppId,
-          }"
-          role="button"
-          tabindex="0"
-          :data-app-id="item.app.id"
-          @click="emit('launch', item.app)"
-          @keydown.enter.prevent="emit('launch', item.app)"
-          @keydown.space.prevent="emit('launch', item.app)"
-          @contextmenu.stop="(e) => emit('contextmenuApp', e, item.app.id)"
-          @mousedown.stop="(e) => onMouseDownApp(e, item.app.id)"
-          @dragover="(e) => emit('externalDragOverApp', e, item.app.id)"
-          @drop.stop="(e) => emit('externalDrop', e)"
-        >
-          <div class="card__icon" :class="{ 'card__icon--img': !!item.app.icon }" aria-hidden="true">
-            <img v-if="item.app.icon" class="card__iconImg" :src="item.app.icon" alt="" draggable="false" />
-            <template v-else>{{ item.app.name.slice(0, 1).toUpperCase() }}</template>
-          </div>
-          <div class="card__name" :title="item.app.name">{{ item.app.name }}</div>
+        <div class="card__icon" :class="{ 'card__icon--img': !!item.icon }" aria-hidden="true">
+          <img v-if="item.icon" class="card__iconImg" :src="item.icon" alt="" draggable="false" />
+          <template v-else>{{ item.name.slice(0, 1).toUpperCase() }}</template>
         </div>
+        <div class="card__name" :title="item.name">{{ item.name }}</div>
       </div>
 
       <div v-if="props.dropEnd" class="grid__dropEnd" aria-hidden="true" />
 
-      <div v-if="apps.length === 0" class="empty">
+      <div v-if="props.apps.length === 0" class="empty">
         <div class="empty__title">{{ t("empty.title") }}</div>
         <div class="empty__hint">{{ t("empty.hint") }}</div>
       </div>
@@ -164,7 +175,7 @@ function onDblClick(ev: MouseEvent): void {
     <div
       v-if="ghost.app && ghost.active"
       class="dragGhost"
-      :style="{ left: `${ghost.x}px`, top: `${ghost.y}px` }"
+      :style="{ left: `${ghost.x - ghost.offsetX}px`, top: `${ghost.y - ghost.offsetY}px` }"
       aria-hidden="true"
     >
       <div class="card card--dragging dragGhost__card">

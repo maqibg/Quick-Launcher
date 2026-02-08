@@ -30,6 +30,7 @@ export type UiSettings = {
   alwaysOnTop: boolean;
   hideOnStartup: boolean;
   useRelativePath: boolean;
+  enableGroupDragSort: boolean;
 };
 
 export type LauncherState = {

@@ -6,6 +6,12 @@ type Props = {
   groups: Group[];
   activeGroupId: string;
   dropTargetGroupId?: string | null;
+  groupDragSortEnabled?: boolean;
+  groupDragDraggingId?: string | null;
+  groupDragReadyId?: string | null;
+  groupDragOverId?: string | null;
+  groupDragOverAfter?: boolean;
+  groupDragOverBlankEnd?: boolean;
 };
 
 defineProps<Props>();
@@ -17,12 +23,30 @@ const emit = defineEmits<{
   (e: "openSettings"): void;
   (e: "externalDragOverGroup", ev: DragEvent, id: string): void;
   (e: "externalDrop", ev: DragEvent): void;
+  (e: "groupPointerDown", ev: PointerEvent, id: string): void;
+  (e: "groupMouseDown", ev: MouseEvent, id: string): void;
 }>();
+
+function onGroupPointerDown(ev: PointerEvent, id: string): void {
+  const target = ev.currentTarget as HTMLElement | null;
+  if (target && "setPointerCapture" in target) {
+    try {
+      target.setPointerCapture(ev.pointerId);
+    } catch {
+      // ignore
+    }
+  }
+  emit("groupPointerDown", ev, id);
+}
+
+function onGroupMouseDown(ev: MouseEvent, id: string): void {
+  emit("groupMouseDown", ev, id);
+}
 </script>
 
 <template>
   <aside class="sidebar" @contextmenu.stop="(e) => emit('contextmenuBlank', e)">
-    <div class="sidebar__groups">
+    <div class="sidebar__groups" :class="{ 'sidebar__groups--dragSortEnd': !!groupDragOverBlankEnd }">
       <button
         v-for="g in groups"
         :key="g.id"
@@ -30,10 +54,20 @@ const emit = defineEmits<{
         :class="{
           'group--active': g.id === activeGroupId,
           'group--dropTarget': !!dropTargetGroupId && g.id === dropTargetGroupId,
+          'group--dragSortEnabled': !!groupDragSortEnabled,
+          'group--dragging': !!groupDragDraggingId && g.id === groupDragDraggingId,
+          'group--dragReady': !!groupDragReadyId && g.id === groupDragReadyId,
+          'group--dragSortTarget': !!groupDragOverId && g.id === groupDragOverId,
+          'group--dragSortBefore':
+            !!groupDragOverId && g.id === groupDragOverId && !groupDragOverAfter,
+          'group--dragSortAfter':
+            !!groupDragOverId && g.id === groupDragOverId && !!groupDragOverAfter,
         }"
         type="button"
         :data-group-id="g.id"
         @click="emit('selectGroup', g.id)"
+        @pointerdown.stop="(e) => onGroupPointerDown(e, g.id)"
+        @mousedown.left.stop="(e) => onGroupMouseDown(e, g.id)"
         @contextmenu.stop="(e) => emit('contextmenuGroup', e, g.id)"
         @dragover="(e) => emit('externalDragOverGroup', e, g.id)"
         @drop.stop="(e) => emit('externalDrop', e)"

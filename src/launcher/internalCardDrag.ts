@@ -1,7 +1,12 @@
 import { reactive } from "vue";
 import type { Group } from "./types";
 import { moveAppByDragPayload } from "./cardDnd";
-import { computeInsertTargetFromGrid } from "./domInsertTarget";
+import {
+  collectGridCardRects,
+  computeInsertTargetFromCards,
+  computeInsertTargetFromGrid,
+  type GridCardRect,
+} from "./domInsertTarget";
 import { t } from "./i18n";
 
 export type InternalCardDragState = {
@@ -36,6 +41,12 @@ export function createInternalCardDrag(opts: {
     | null = null;
 
   let suppressClickUntil = 0;
+  let positionCache: GridCardRect[] = [];
+  let cachedGridRoot: HTMLElement | null = null;
+  let cachedScrollTop = 0;
+  let cachedScrollLeft = 0;
+  let dragFrame: number | null = null;
+  let pendingPointer: { x: number; y: number } | null = null;
 
   function clearIndicators(): void {
     state.dropBeforeAppId = null;
@@ -48,6 +59,15 @@ export function createInternalCardDrag(opts: {
     state.dragging = false;
     state.draggedAppId = null;
     clearIndicators();
+    positionCache = [];
+    cachedGridRoot = null;
+    cachedScrollTop = 0;
+    cachedScrollLeft = 0;
+    if (dragFrame != null) {
+      window.cancelAnimationFrame(dragFrame);
+      dragFrame = null;
+    }
+    pendingPointer = null;
     window.removeEventListener("mousemove", onMove, true);
     window.removeEventListener("mouseup", onUp, true);
   }
@@ -57,6 +77,33 @@ export function createInternalCardDrag(opts: {
     const dx = ev.clientX - pending.startX;
     const dy = ev.clientY - pending.startY;
     return dx * dx + dy * dy >= 16;
+  }
+
+  function cacheCardPositions(root?: HTMLElement | null): void {
+    const nextRoot = root ?? (document.querySelector(".grid") as HTMLElement | null);
+    cachedGridRoot = nextRoot;
+    if (!cachedGridRoot) {
+      positionCache = [];
+      cachedScrollTop = 0;
+      cachedScrollLeft = 0;
+      return;
+    }
+    positionCache = collectGridCardRects({
+      root: cachedGridRoot,
+      excludeAppId: pending?.appId ?? null,
+    });
+    cachedScrollTop = cachedGridRoot.scrollTop;
+    cachedScrollLeft = cachedGridRoot.scrollLeft;
+  }
+
+  function ensureCardPositionsFor(root: HTMLElement): void {
+    const rootChanged = cachedGridRoot !== root;
+    const scrolled =
+      cachedGridRoot === root &&
+      (root.scrollTop !== cachedScrollTop || root.scrollLeft !== cachedScrollLeft);
+    if (rootChanged || scrolled || positionCache.length === 0) {
+      cacheCardPositions(root);
+    }
   }
 
   function updateTargetFromPoint(x: number, y: number): void {
@@ -73,12 +120,16 @@ export function createInternalCardDrag(opts: {
     const gridEl = el?.closest?.(".grid") as HTMLElement | null;
     const active = opts.getActiveGroup();
     if (gridEl && active) {
-      const computed = computeInsertTargetFromGrid({
-        root: gridEl,
-        x,
-        y,
-        excludeAppId: pending?.appId ?? null,
-      });
+      ensureCardPositionsFor(gridEl);
+      const computed =
+        positionCache.length > 0
+          ? computeInsertTargetFromCards({ cards: positionCache, x, y })
+          : computeInsertTargetFromGrid({
+              root: gridEl,
+              x,
+              y,
+              excludeAppId: pending?.appId ?? null,
+            });
       state.dropBeforeAppId = computed.beforeAppId;
       state.dropGroupId = null;
       state.dropEnd = computed.end;
@@ -90,19 +141,42 @@ export function createInternalCardDrag(opts: {
     state.dropEnd = true;
   }
 
+  function flushMoveFrame(): void {
+    dragFrame = null;
+    const point = pendingPointer;
+    if (!point || !pending) return;
+    pendingPointer = null;
+    updateTargetFromPoint(point.x, point.y);
+  }
+
+  function scheduleMoveUpdate(x: number, y: number): void {
+    pendingPointer = { x, y };
+    if (dragFrame != null) return;
+    dragFrame = window.requestAnimationFrame(flushMoveFrame);
+  }
+
   function onMove(ev: MouseEvent): void {
     if (!pending) return;
     if (!state.dragging) {
       if (!isDraggingEnough(ev)) return;
       state.dragging = true;
       state.draggedAppId = pending.appId;
+      cacheCardPositions();
     }
-    updateTargetFromPoint(ev.clientX, ev.clientY);
+    scheduleMoveUpdate(ev.clientX, ev.clientY);
     ev.preventDefault();
   }
 
   function onUp(ev: MouseEvent): void {
     if (!pending) return;
+    if (dragFrame != null) {
+      window.cancelAnimationFrame(dragFrame);
+      dragFrame = null;
+    }
+    pendingPointer = null;
+    if (state.dragging) {
+      updateTargetFromPoint(ev.clientX, ev.clientY);
+    }
     const active = opts.getActiveGroup();
     if (state.dragging && active) {
       let toGroupId = active.id;

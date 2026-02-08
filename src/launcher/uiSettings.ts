@@ -74,6 +74,9 @@ export function applyLoadedUiSettings(target: UiSettings, loaded: UiSettings): v
 
   const maybeRelativePath = (loaded as any).useRelativePath;
   if (typeof maybeRelativePath === "boolean") target.useRelativePath = maybeRelativePath;
+
+  const maybeGroupDragSort = (loaded as any).enableGroupDragSort;
+  if (typeof maybeGroupDragSort === "boolean") target.enableGroupDragSort = maybeGroupDragSort;
 }
 
 export function computeAppStyle(settings: UiSettings): Record<string, string> {

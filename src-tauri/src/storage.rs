@@ -1,7 +1,7 @@
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::PathBuf,
 };
@@ -48,10 +48,17 @@ pub struct UiSettings {
         default = "default_dbl_click_blank_to_hide"
     )]
     pub dbl_click_blank_to_hide: bool,
+    #[serde(rename = "alwaysOnTop", default = "default_always_on_top")]
+    pub always_on_top: bool,
     #[serde(rename = "hideOnStartup", default = "default_hide_on_startup")]
     pub hide_on_startup: bool,
     #[serde(rename = "useRelativePath", default = "default_use_relative_path")]
     pub use_relative_path: bool,
+    #[serde(
+        rename = "enableGroupDragSort",
+        default = "default_enable_group_drag_sort"
+    )]
+    pub enable_group_drag_sort: bool,
 }
 
 fn default_language() -> String {
@@ -90,11 +97,19 @@ fn default_dbl_click_blank_to_hide() -> bool {
     true
 }
 
+fn default_always_on_top() -> bool {
+    true
+}
+
 fn default_hide_on_startup() -> bool {
     false
 }
 
 fn default_use_relative_path() -> bool {
+    false
+}
+
+fn default_enable_group_drag_sort() -> bool {
     false
 }
 
@@ -112,8 +127,10 @@ impl Default for UiSettings {
             card_font_size: default_card_font_size(),
             card_icon_scale: default_card_icon_scale(),
             dbl_click_blank_to_hide: default_dbl_click_blank_to_hide(),
+            always_on_top: default_always_on_top(),
             hide_on_startup: default_hide_on_startup(),
             use_relative_path: default_use_relative_path(),
+            enable_group_drag_sort: default_enable_group_drag_sort(),
         }
     }
 }
@@ -138,13 +155,17 @@ pub struct AppEntry {
     pub added_at: i64,
 }
 
-fn db_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let base_dir = app.path().local_data_dir().map_err(|e| e.to_string())?;
-    Ok(base_dir.join("my-quickstart").join("launcher.db"))
+fn db_path(_app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let base = crate::paths::app_base_dir().ok_or("Cannot determine exe directory")?;
+    Ok(base.join("data").join("launcher.db"))
 }
 
 fn legacy_db_paths(app: &tauri::AppHandle) -> Vec<PathBuf> {
     let mut paths = Vec::new();
+    // 旧版: %localappdata%/my-quickstart/launcher.db
+    if let Ok(p) = app.path().local_data_dir() {
+        paths.push(p.join("my-quickstart").join("launcher.db"));
+    }
     if let Ok(p) = app.path().app_local_data_dir() {
         paths.push(p.join("launcher.db"));
     }
@@ -199,6 +220,12 @@ fn open_db(app: &tauri::AppHandle) -> Result<Connection, String> {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let conn = Connection::open(path).map_err(|e| e.to_string())?;
+    conn.pragma_update(None, "journal_mode", "WAL")
+        .map_err(|e| e.to_string())?;
+    conn.pragma_update(None, "synchronous", "NORMAL")
+        .map_err(|e| e.to_string())?;
+    conn.pragma_update(None, "busy_timeout", "5000")
+        .map_err(|e| e.to_string())?;
     conn.pragma_update(None, "foreign_keys", "ON")
         .map_err(|e| e.to_string())?;
     conn.execute_batch(
@@ -223,7 +250,21 @@ CREATE TABLE IF NOT EXISTS apps (
   added_at INTEGER NOT NULL,
   FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
 );
+CREATE INDEX IF NOT EXISTS idx_apps_group_position ON apps(group_id, position);
+CREATE TABLE IF NOT EXISTS app_icons (
+  app_id TEXT PRIMARY KEY,
+  icon TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
 "#,
+    )
+    .map_err(|e| e.to_string())?;
+
+    // Migration: apps.icon -> app_icons
+    conn.execute(
+        "INSERT OR IGNORE INTO app_icons (app_id, icon, updated_at)
+         SELECT id, icon, added_at FROM apps WHERE icon != ''",
+        [],
     )
     .map_err(|e| e.to_string())?;
 
@@ -278,7 +319,10 @@ pub fn load_launcher_state(app: tauri::AppHandle) -> Result<Option<LauncherState
 
     let mut apps_stmt = conn
         .prepare(
-            "SELECT id, group_id, name, path, args, icon, added_at FROM apps ORDER BY position ASC",
+            "SELECT a.id, a.group_id, a.name, a.path, a.args, COALESCE(i.icon, a.icon) as icon, a.added_at
+             FROM apps a
+             LEFT JOIN app_icons i ON a.id = i.app_id
+             ORDER BY a.position ASC",
         )
         .map_err(|e| e.to_string())?;
     let app_rows = apps_stmt
@@ -340,35 +384,49 @@ pub fn save_launcher_state(app: tauri::AppHandle, state: LauncherState) -> Resul
     let mut conn = open_db(&app)?;
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
-    tx.execute("DELETE FROM apps", []).map_err(|e| e.to_string())?;
-    tx.execute("DELETE FROM groups", [])
-        .map_err(|e| e.to_string())?;
-    tx.execute("DELETE FROM meta", []).map_err(|e| e.to_string())?;
-
+    // UPSERT meta
     tx.execute(
-        "INSERT INTO meta(key, value) VALUES('active_group_id', ?1)",
+        "INSERT INTO meta(key, value) VALUES('active_group_id', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         params![state.active_group_id],
     )
     .map_err(|e| e.to_string())?;
 
     let settings_json = serde_json::to_string(&state.settings).map_err(|e| e.to_string())?;
     tx.execute(
-        "INSERT INTO meta(key, value) VALUES('ui_settings', ?1)",
+        "INSERT INTO meta(key, value) VALUES('ui_settings', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         params![settings_json],
     )
     .map_err(|e| e.to_string())?;
 
+    // Collect current IDs for diff delete
+    let mut new_group_ids: HashSet<String> = HashSet::new();
+    let mut new_app_ids: HashSet<String> = HashSet::new();
+
+    // UPSERT groups
     for (group_pos, group) in state.groups.iter().enumerate() {
+        new_group_ids.insert(group.id.clone());
         tx.execute(
-            "INSERT INTO groups(id, name, position) VALUES(?1, ?2, ?3)",
+            "INSERT INTO groups(id, name, position) VALUES(?1, ?2, ?3)
+             ON CONFLICT(id) DO UPDATE SET name = excluded.name, position = excluded.position",
             params![group.id, group.name, group_pos as i64],
         )
         .map_err(|e| e.to_string())?;
 
+        // UPSERT apps
         for (app_pos, app_entry) in group.apps.iter().enumerate() {
+            new_app_ids.insert(app_entry.id.clone());
             tx.execute(
                 "INSERT INTO apps(id, group_id, name, path, args, icon, position, added_at)
-                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                 ON CONFLICT(id) DO UPDATE SET
+                   group_id = excluded.group_id,
+                   name = excluded.name,
+                   path = excluded.path,
+                   args = excluded.args,
+                   icon = excluded.icon,
+                   position = excluded.position",
                 params![
                     app_entry.id,
                     group.id,
@@ -382,6 +440,26 @@ pub fn save_launcher_state(app: tauri::AppHandle, state: LauncherState) -> Resul
             )
             .map_err(|e| e.to_string())?;
         }
+    }
+
+    // Delete removed apps (diff delete)
+    if !new_app_ids.is_empty() {
+        let placeholders: String = new_app_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!("DELETE FROM apps WHERE id NOT IN ({})", placeholders);
+        let params: Vec<&dyn rusqlite::ToSql> = new_app_ids.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
+        tx.execute(&sql, params.as_slice()).map_err(|e| e.to_string())?;
+    } else {
+        tx.execute("DELETE FROM apps", []).map_err(|e| e.to_string())?;
+    }
+
+    // Delete removed groups (diff delete)
+    if !new_group_ids.is_empty() {
+        let placeholders: String = new_group_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!("DELETE FROM groups WHERE id NOT IN ({})", placeholders);
+        let params: Vec<&dyn rusqlite::ToSql> = new_group_ids.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
+        tx.execute(&sql, params.as_slice()).map_err(|e| e.to_string())?;
+    } else {
+        tx.execute("DELETE FROM groups", []).map_err(|e| e.to_string())?;
     }
 
     tx.commit().map_err(|e| e.to_string())

@@ -82,6 +82,7 @@ input {
   border-bottom: 1px solid var(--divider);
   background: var(--surface-strong);
   backdrop-filter: blur(12px);
+  position: relative;
 }
 
 .topbar__drag {
@@ -98,13 +99,10 @@ input {
   opacity: 0.95;
 }
 
-.topbar__right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 .topbar__search {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   width: min(420px, 40vw);
   height: 32px;
   padding: 0 12px;
@@ -170,11 +168,11 @@ input {
 
 .sidebar__groups {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  overflow: auto;
-  max-height: calc(100vh - 44px - 56px);
+  overflow-y: auto;
   padding-right: 4px;
 }
 

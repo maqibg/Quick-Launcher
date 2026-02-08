@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# AI artifacts
+.ace-tool/
+.claude/
+openspec/
+AGENTS.md
+README_CN.md
+nul
+
+# Private data
+数据备份/

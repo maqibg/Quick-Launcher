@@ -43,10 +43,13 @@ const {
   onMouseDownApp,
   onExternalDragOverBlank,
   onExternalDragOverApp,
-  onExternalDragOverGroup,
-  onExternalDrop,
-  minimizeWindow,
-  toggleMaximizeWindow,
+      onExternalDragOverGroup,
+      onExternalDrop,
+      observeIcon,
+      unobserveIcon,
+      minimizeWindow,
+      toggleMaximizeWindow,
+  
   closeWindow,
   startWindowDragging,
   closeEditor,
@@ -70,8 +73,16 @@ const {
   updateAlwaysOnTop,
   updateHideOnStartup,
   updateUseRelativePath,
+  updateEnableGroupDragSort,
   applyToggleHotkey,
   onMainBlankDoubleClick,
+  draggingGroupId,
+  groupDragReadyId,
+  groupDragOverId,
+  groupDragOverAfter,
+  groupDragOverBlankEnd,
+  onGroupPointerDown,
+  onGroupMouseDown,
 } = useLauncherModel();
 
 function onSidebarBlank(ev: MouseEvent): void {
@@ -93,6 +104,14 @@ function onGridApp(ev: MouseEvent, id: string): void {
 function onGridBlankDblClick(): void {
   onMainBlankDoubleClick();
 }
+
+function onSidebarGroupPointerDown(ev: PointerEvent, id: string): void {
+  onGroupPointerDown(ev, id);
+}
+
+function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
+  onGroupMouseDown(ev, id);
+}
 </script>
 
 <template>
@@ -112,11 +131,19 @@ function onGridBlankDblClick(): void {
         :groups="state.groups"
         :active-group-id="state.activeGroupId"
         :drop-target-group-id="dropTargetGroupId"
+        :group-drag-sort-enabled="state.settings.enableGroupDragSort"
+        :group-drag-dragging-id="draggingGroupId"
+        :group-drag-ready-id="groupDragReadyId"
+        :group-drag-over-id="groupDragOverId"
+        :group-drag-over-after="groupDragOverAfter"
+        :group-drag-over-blank-end="groupDragOverBlankEnd"
         @select-group="setActiveGroup"
         @contextmenu-blank="onSidebarBlank"
         @contextmenu-group="onSidebarGroup"
         @external-drag-over-group="onExternalDragOverGroup"
         @external-drop="onExternalDrop"
+        @group-pointer-down="onSidebarGroupPointerDown"
+        @group-mouse-down="onSidebarGroupMouseDown"
         @open-settings="openSettings"
       />
 
@@ -126,6 +153,8 @@ function onGridBlankDblClick(): void {
       :dragging-app-id="draggingAppId"
       :drop-before-app-id="dropBeforeAppId"
       :drop-end="dropEnd"
+      :observe-icon="observeIcon"
+      :unobserve-icon="unobserveIcon"
         @launch="launch"
         @contextmenu-blank="onGridBlank"
         @contextmenu-app="onGridApp"
@@ -188,6 +217,7 @@ function onGridBlankDblClick(): void {
       :always-on-top="state.settings.alwaysOnTop"
       :hide-on-startup="state.settings.hideOnStartup"
       :use-relative-path="state.settings.useRelativePath"
+      :enable-group-drag-sort="state.settings.enableGroupDragSort"
       @close="closeSettings"
       @update-card-width="updateCardWidth"
       @update-card-height="updateCardHeight"
@@ -202,6 +232,7 @@ function onGridBlankDblClick(): void {
       @update-always-on-top="updateAlwaysOnTop"
       @update-hide-on-startup="updateHideOnStartup"
       @update-use-relative-path="updateUseRelativePath"
+      @update-enable-group-drag-sort="updateEnableGroupDragSort"
       @apply-hotkey="applyToggleHotkey"
     />
 

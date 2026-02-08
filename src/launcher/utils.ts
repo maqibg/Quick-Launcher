@@ -37,6 +37,7 @@ export function createDefaultState(): LauncherState {
     alwaysOnTop: true,
     hideOnStartup: false,
     useRelativePath: false,
+    enableGroupDragSort: true,
   };
   const groups: Group[] = [
     { id: createId(), name: "Group-1", apps: [] },

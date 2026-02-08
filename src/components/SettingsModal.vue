@@ -19,6 +19,7 @@ type Props = {
   alwaysOnTop: boolean;
   hideOnStartup: boolean;
   useRelativePath: boolean;
+  enableGroupDragSort: boolean;
 };
 
 const props = defineProps<Props>();
@@ -39,6 +40,7 @@ const emit = defineEmits<{
   (e: "updateAlwaysOnTop", value: boolean): void;
   (e: "updateHideOnStartup", value: boolean): void;
   (e: "updateUseRelativePath", value: boolean): void;
+  (e: "updateEnableGroupDragSort", value: boolean): void;
 }>();
 
 const language = ref("en");
@@ -55,6 +57,7 @@ const dblclickBlankToHide = ref(true);
 const alwaysOnTop = ref(true);
 const hideOnStartup = ref(false);
 const useRelativePath = ref(false);
+const enableGroupDragSort = ref(false);
 const panelEl = ref<HTMLElement | null>(null);
 const panelX = ref(0);
 const panelY = ref(0);
@@ -164,6 +167,7 @@ watch(
     alwaysOnTop.value = props.alwaysOnTop;
     hideOnStartup.value = props.hideOnStartup;
     useRelativePath.value = props.useRelativePath;
+    enableGroupDragSort.value = props.enableGroupDragSort;
   },
   { immediate: true },
 );
@@ -256,6 +260,12 @@ function onUseRelativePathChange(ev: Event): void {
   const next = (ev.target as HTMLInputElement).checked;
   useRelativePath.value = next;
   emit("updateUseRelativePath", next);
+}
+
+function onEnableGroupDragSortChange(ev: Event): void {
+  const next = (ev.target as HTMLInputElement).checked;
+  enableGroupDragSort.value = next;
+  emit("updateEnableGroupDragSort", next);
 }
 
 function onApplyHotkey(): void {
@@ -461,6 +471,16 @@ function onApplyHotkey(): void {
             @change="onUseRelativePathChange"
           />
           <span class="check__label">{{ t("settings.behavior.useRelativePath") }}</span>
+        </label>
+
+        <label class="check">
+          <input
+            class="check__input"
+            type="checkbox"
+            :checked="enableGroupDragSort"
+            @change="onEnableGroupDragSortChange"
+          />
+          <span class="check__label">{{ t("settings.behavior.enableGroupDragSort") }}</span>
         </label>
       </template>
 

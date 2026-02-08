@@ -128,6 +128,9 @@ function coerceLauncherState(value: unknown): LauncherState | null {
   if (typeof rawSettings.useRelativePath === "boolean") {
     settings.useRelativePath = rawSettings.useRelativePath;
   }
+  if (typeof rawSettings.enableGroupDragSort === "boolean") {
+    settings.enableGroupDragSort = rawSettings.enableGroupDragSort;
+  }
 
   const activeGroupId =
     typeof raw.activeGroupId === "string" &&
