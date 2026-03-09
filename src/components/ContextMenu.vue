@@ -13,6 +13,8 @@ type Props = {
   groups?: Group[];
   activeGroupId?: string;
   appGroupId?: string;
+  theme?: "dark" | "light";
+  appStyle?: Record<string, string>;
 };
 
 const props = defineProps<Props>();
@@ -94,102 +96,105 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div
-    v-if="open"
-    ref="menuRef"
-    class="menu"
-    :style="{ left: `${position.left}px`, top: `${position.top}px` }"
-    @click.stop
-    @contextmenu.prevent
-  >
-    <template v-if="kind === 'blankMain'">
-      <button class="menu__item" type="button" @click="emit('addApp')">
-        {{ t("menu.addApp") }}
-      </button>
-      <button class="menu__item" type="button" @click="emit('addUwpApp')">
-        {{ t("menu.addUwpApp") }}
-      </button>
-      <button class="menu__item" type="button" @click="emit('addUrl')">
-        {{ t("menu.addUrl") }}
-      </button>
-      <button class="menu__item" type="button" @click="emit('addScript')">
-        {{ t("menu.addScript") }}
-      </button>
-      <button class="menu__item" type="button" @click="emit('addBuiltin')">
-        {{ t("menu.addBuiltin") }}
-      </button>
-    </template>
-
-    <template v-else-if="kind === 'blankSidebar'">
-      <button class="menu__item" type="button" @click="emit('addGroup')">
-        {{ t("menu.addGroup") }}
-      </button>
-    </template>
-
-    <template v-else-if="kind === 'app'">
-      <button class="menu__item" type="button" @click="emit('openApp')">
-        {{ t("menu.open") }}
-      </button>
-      <button class="menu__item" type="button" @click="emit('runAsAdmin')">
-        {{ t("menu.runAsAdmin") }}
-      </button>
-      <button class="menu__item" type="button" @click="emit('openWith')">
-        {{ t("menu.openWith") }}
-      </button>
-      <button class="menu__item" type="button" @click="emit('openAppFolder')">
-        {{ t("menu.openFolder") }}
-      </button>
-      <button class="menu__item" type="button" @click="emit('editApp')">
-        {{ t("menu.edit") }}
-      </button>
-      <div v-if="menuTargetGroups.length > 0" class="menu__separator" />
-      <div v-if="menuTargetGroups.length > 0" class="menu__sub">
-        <button class="menu__item" type="button">
-          {{ t("menu.copyTo") }}
-          <span class="menu__arrow">&#9656;</span>
+  <Teleport to="body">
+    <div
+      v-if="open"
+      ref="menuRef"
+      class="menu"
+      :data-theme="theme ?? 'dark'"
+      :style="{ left: `${position.left}px`, top: `${position.top}px`, ...(appStyle ?? {}) }"
+      @click.stop
+      @contextmenu.prevent
+    >
+      <template v-if="kind === 'blankMain'">
+        <button class="menu__item" type="button" @click="emit('addApp')">
+          {{ t("menu.addApp") }}
         </button>
-        <div class="menu__sub-panel">
-          <button
-            v-for="g in menuTargetGroups"
-            :key="`copy-${g.id}`"
-            class="menu__item"
-            type="button"
-            @click="emit('copyToGroup', g.id)"
-          >
-            {{ g.name }}
-          </button>
-        </div>
-      </div>
-      <div v-if="menuTargetGroups.length > 0" class="menu__sub">
-        <button class="menu__item" type="button">
-          {{ t("menu.moveTo") }}
-          <span class="menu__arrow">&#9656;</span>
+        <button class="menu__item" type="button" @click="emit('addUwpApp')">
+          {{ t("menu.addUwpApp") }}
         </button>
-        <div class="menu__sub-panel">
-          <button
-            v-for="g in menuTargetGroups"
-            :key="g.id"
-            class="menu__item"
-            type="button"
-            @click="emit('moveToGroup', g.id)"
-          >
-            {{ g.name }}
-          </button>
-        </div>
-      </div>
-      <div class="menu__separator" />
-      <button class="menu__item menu__item--danger" type="button" @click="emit('removeApp')">
-        {{ t("menu.remove") }}
-      </button>
-    </template>
+        <button class="menu__item" type="button" @click="emit('addUrl')">
+          {{ t("menu.addUrl") }}
+        </button>
+        <button class="menu__item" type="button" @click="emit('addScript')">
+          {{ t("menu.addScript") }}
+        </button>
+        <button class="menu__item" type="button" @click="emit('addBuiltin')">
+          {{ t("menu.addBuiltin") }}
+        </button>
+      </template>
 
-    <template v-else-if="kind === 'group'">
-      <button class="menu__item" type="button" @click="emit('renameGroup')">
-        {{ t("menu.rename") }}
-      </button>
-      <button class="menu__item menu__item--danger" type="button" @click="emit('removeGroup')">
-        {{ t("menu.removeGroup") }}
-      </button>
-    </template>
-  </div>
+      <template v-else-if="kind === 'blankSidebar'">
+        <button class="menu__item" type="button" @click="emit('addGroup')">
+          {{ t("menu.addGroup") }}
+        </button>
+      </template>
+
+      <template v-else-if="kind === 'app'">
+        <button class="menu__item" type="button" @click="emit('openApp')">
+          {{ t("menu.open") }}
+        </button>
+        <button class="menu__item" type="button" @click="emit('runAsAdmin')">
+          {{ t("menu.runAsAdmin") }}
+        </button>
+        <button class="menu__item" type="button" @click="emit('openWith')">
+          {{ t("menu.openWith") }}
+        </button>
+        <button class="menu__item" type="button" @click="emit('openAppFolder')">
+          {{ t("menu.openFolder") }}
+        </button>
+        <button class="menu__item" type="button" @click="emit('editApp')">
+          {{ t("menu.edit") }}
+        </button>
+        <div v-if="menuTargetGroups.length > 0" class="menu__separator" />
+        <div v-if="menuTargetGroups.length > 0" class="menu__sub">
+          <button class="menu__item" type="button">
+            {{ t("menu.copyTo") }}
+            <span class="menu__arrow">&#9656;</span>
+          </button>
+          <div class="menu__sub-panel">
+            <button
+              v-for="g in menuTargetGroups"
+              :key="`copy-${g.id}`"
+              class="menu__item"
+              type="button"
+              @click="emit('copyToGroup', g.id)"
+            >
+              {{ g.name }}
+            </button>
+          </div>
+        </div>
+        <div v-if="menuTargetGroups.length > 0" class="menu__sub">
+          <button class="menu__item" type="button">
+            {{ t("menu.moveTo") }}
+            <span class="menu__arrow">&#9656;</span>
+          </button>
+          <div class="menu__sub-panel">
+            <button
+              v-for="g in menuTargetGroups"
+              :key="g.id"
+              class="menu__item"
+              type="button"
+              @click="emit('moveToGroup', g.id)"
+            >
+              {{ g.name }}
+            </button>
+          </div>
+        </div>
+        <div class="menu__separator" />
+        <button class="menu__item menu__item--danger" type="button" @click="emit('removeApp')">
+          {{ t("menu.remove") }}
+        </button>
+      </template>
+
+      <template v-else-if="kind === 'group'">
+        <button class="menu__item" type="button" @click="emit('renameGroup')">
+          {{ t("menu.rename") }}
+        </button>
+        <button class="menu__item menu__item--danger" type="button" @click="emit('removeGroup')">
+          {{ t("menu.removeGroup") }}
+        </button>
+      </template>
+    </div>
+  </Teleport>
 </template>

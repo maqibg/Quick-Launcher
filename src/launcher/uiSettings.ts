@@ -19,7 +19,7 @@ export function clampCardHeight(value: number): number {
 }
 
 export function clampSidebarWidth(value: number): number {
-  return clamp(Math.round(value), 90, 320);
+  return clamp(Math.round(value), 160, 320);
 }
 
 export function clampFontSize(value: number): number {
@@ -32,6 +32,14 @@ export function clampCardFontSize(value: number): number {
 
 export function clampCardIconScale(value: number, max: number): number {
   return clamp(Math.round(value), 16, Math.max(16, Math.round(max)));
+}
+
+export function clampBackgroundBlur(value: number): number {
+  return clamp(Math.round(value), 0, 40);
+}
+
+export function clampBackgroundScale(value: number): number {
+  return clamp(Math.round(value), 50, 200);
 }
 
 export function applyLoadedUiSettings(target: UiSettings, loaded: UiSettings): void {
@@ -80,6 +88,29 @@ export function applyLoadedUiSettings(target: UiSettings, loaded: UiSettings): v
 
   const maybeAutoStart = (loaded as any).autoStart;
   if (typeof maybeAutoStart === "boolean") target.autoStart = maybeAutoStart;
+
+  const maybeBackgroundEnabled = (loaded as any).customBackgroundEnabled;
+  if (typeof maybeBackgroundEnabled === "boolean") {
+    target.customBackgroundEnabled = maybeBackgroundEnabled;
+  }
+
+  const maybeBackgroundPath = (loaded as any).customBackgroundPath;
+  if (typeof maybeBackgroundPath === "string") {
+    target.customBackgroundPath = maybeBackgroundPath;
+  }
+
+  const maybeBackgroundBlur = (loaded as any).customBackgroundBlur;
+  if (typeof maybeBackgroundBlur === "number") {
+    target.customBackgroundBlur = clampBackgroundBlur(maybeBackgroundBlur);
+  }
+  const maybeBackgroundScaleX = (loaded as any).customBackgroundScaleX;
+  if (typeof maybeBackgroundScaleX === "number") {
+    target.customBackgroundScaleX = clampBackgroundScale(maybeBackgroundScaleX);
+  }
+  const maybeBackgroundScaleY = (loaded as any).customBackgroundScaleY;
+  if (typeof maybeBackgroundScaleY === "number") {
+    target.customBackgroundScaleY = clampBackgroundScale(maybeBackgroundScaleY);
+  }
 }
 
 export function computeAppStyle(settings: UiSettings): Record<string, string> {

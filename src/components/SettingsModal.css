@@ -62,3 +62,48 @@
   opacity: 0.92;
 }
 
+.settingsRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.settingsRow__input {
+  flex: 1;
+  min-width: 0;
+}
+
+.backgroundPreview {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-input);
+  overflow: hidden;
+  height: 180px;
+  display: grid;
+  place-items: center;
+}
+
+.backgroundPreview__image {
+  display: block;
+  max-width: none;
+  max-height: none;
+  object-fit: fill;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.settingsScaleRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.settingsScaleRow__range {
+  flex: 1;
+  min-width: 0;
+}
+
+.settingsScaleRow__number {
+  width: 92px;
+  text-align: right;
+}
+

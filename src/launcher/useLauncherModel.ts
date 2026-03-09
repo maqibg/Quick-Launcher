@@ -1,5 +1,6 @@
 import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createWindowControls } from "./windowControls";
 
 import { loadState, saveState } from "./storage";
@@ -26,6 +27,8 @@ import {
   clampCardWidth,
   clampCardFontSize,
   clampFontSize,
+  clampBackgroundBlur,
+  clampBackgroundScale,
   clampSidebarWidth,
   computeAppStyle,
   normalizeTheme,
@@ -44,6 +47,7 @@ export function useLauncherModel() {
   setUiLanguage(state.settings.language);
   const search = ref("");
   const toast = ref<string | null>(null);
+  const backgroundImageUrl = ref("");
   const hydrated = ref(false);
   const settingsOpen = ref(false);
 
@@ -163,6 +167,37 @@ export function useLauncherModel() {
   const appStyle = computed<Record<string, string>>(() => {
     return computeAppStyle(state.settings);
   });
+  const customBackgroundActive = computed(
+    () => state.settings.customBackgroundEnabled && !!backgroundImageUrl.value,
+  );
+  const customBackgroundBlur = computed(() => state.settings.customBackgroundBlur);
+  const customBackgroundScaleX = computed(() => state.settings.customBackgroundScaleX);
+  const customBackgroundScaleY = computed(() => state.settings.customBackgroundScaleY);
+
+  async function refreshBackgroundImage(showError = false): Promise<void> {
+    const path = state.settings.customBackgroundPath.trim();
+    if (!path) {
+      backgroundImageUrl.value = "";
+      return;
+    }
+    if (!tauriRuntime) {
+      backgroundImageUrl.value = "";
+      return;
+    }
+    try {
+      const result = (await invoke("read_image_as_data_url", { path })) as unknown;
+      backgroundImageUrl.value = typeof result === "string" ? result : "";
+    } catch (e) {
+      backgroundImageUrl.value = "";
+      if (showError) {
+        showToast(
+          t("error.backgroundLoadFailed", {
+            error: e instanceof Error ? e.message : String(e),
+          }),
+        );
+      }
+    }
+  }
 
   function applyLoadedState(loaded: LauncherState): void {
     state.version = loaded.version;
@@ -171,6 +206,7 @@ export function useLauncherModel() {
     applyLoadedUiSettings(state.settings, loaded.settings);
     setUiLanguage(state.settings.language);
     rebuildSearchIndex();
+    void refreshBackgroundImage(false);
   }
 
   function showToast(message: string): void {
@@ -1154,6 +1190,58 @@ export function useLauncherModel() {
     scheduleSave();
   }
 
+  function updateCustomBackgroundEnabled(value: boolean): void {
+    state.settings.customBackgroundEnabled = value;
+    scheduleSave();
+  }
+
+  function updateCustomBackgroundBlur(value: number): void {
+    state.settings.customBackgroundBlur = clampBackgroundBlur(value);
+    scheduleSave();
+  }
+
+  function updateCustomBackgroundScaleX(value: number): void {
+    state.settings.customBackgroundScaleX = clampBackgroundScale(value);
+    scheduleSave();
+  }
+
+  function updateCustomBackgroundScaleY(value: number): void {
+    state.settings.customBackgroundScaleY = clampBackgroundScale(value);
+    scheduleSave();
+  }
+
+  async function pickCustomBackground(): Promise<void> {
+    if (!tauriRuntime) {
+      showToast(t("error.tauriRuntimeRequired"));
+      return;
+    }
+    const selection = await openDialog({
+      directory: false,
+      multiple: false,
+      title: t("dialog.selectBackgroundTitle"),
+      filters: [
+        {
+          name: "Images",
+          extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "svg"],
+        },
+      ],
+    });
+    if (!selection) return;
+    const nextPath = Array.isArray(selection) ? selection[0] : selection;
+    if (!nextPath || typeof nextPath !== "string") return;
+    state.settings.customBackgroundPath = nextPath;
+    state.settings.customBackgroundEnabled = true;
+    await refreshBackgroundImage(true);
+    scheduleSave();
+  }
+
+  function clearCustomBackground(): void {
+    state.settings.customBackgroundPath = "";
+    state.settings.customBackgroundEnabled = false;
+    backgroundImageUrl.value = "";
+    scheduleSave();
+  }
+
   async function applyToggleHotkey(value: string): Promise<void> {
     if (!tauriRuntime) {
       showToast(t("error.tauriRuntimeRequired"));
@@ -1180,6 +1268,12 @@ export function useLauncherModel() {
         stopGroupSortTracking();
         clearGroupSortState();
       }
+    },
+  );
+  watch(
+    () => state.settings.customBackgroundPath,
+    () => {
+      void refreshBackgroundImage(false);
     },
   );
 
@@ -1250,7 +1344,8 @@ export function useLauncherModel() {
   return {
     tauriRuntime, state, search, toast,
     settingsOpen, addAppOpen, urlState: url, scriptState: script, builtinOpen, builtinItems,
-    appStyle, filteredApps, isSearching,
+    appStyle, customBackgroundActive, customBackgroundBlur, customBackgroundScaleX, customBackgroundScaleY, backgroundImageUrl,
+    filteredApps, isSearching,
     menu, editor, rename, setActiveGroup, launch,
     selectedAppIds, onAppClick, clearSelection, removeSelectedApps, moveSelectedToGroup,
     openMenu, closeMenu, menuAddApp, menuAddUwpApp, menuAddUrl, menuAddScript, menuAddBuiltin, menuAddGroup,
@@ -1263,6 +1358,8 @@ export function useLauncherModel() {
     updateCardWidth, updateCardHeight, updateSidebarWidth, updateFontFamily, updateFontSize,
     updateCardFontSize, updateCardIconScale, updateTheme, updateDblClickBlankToHide,
     updateLanguage, updateAlwaysOnTop, updateHideOnStartup, updateUseRelativePath, updateEnableGroupDragSort, updateAutoStart,
+    updateCustomBackgroundEnabled, updateCustomBackgroundBlur, updateCustomBackgroundScaleX, updateCustomBackgroundScaleY,
+    pickCustomBackground, clearCustomBackground,
     applyToggleHotkey, onMainBlankDoubleClick,
     openRenameGroup: openRename, closeRenameGroup: closeRename, saveRenameGroup: saveRename,
     draggingAppId, dropBeforeAppId, dropEnd, dropTargetGroupId, draggingGroupId, groupDragReadyId, groupDragOverId,

@@ -21,6 +21,12 @@ type Props = {
   useRelativePath: boolean;
   enableGroupDragSort: boolean;
   autoStart: boolean;
+  customBackgroundEnabled: boolean;
+  customBackgroundPath: string;
+  customBackgroundBlur: number;
+  customBackgroundScaleX: number;
+  customBackgroundScaleY: number;
+  customBackgroundPreview: string;
 };
 
 const props = defineProps<Props>();
@@ -43,6 +49,12 @@ const emit = defineEmits<{
   (e: "updateUseRelativePath", value: boolean): void;
   (e: "updateEnableGroupDragSort", value: boolean): void;
   (e: "updateAutoStart", value: boolean): void;
+  (e: "updateCustomBackgroundEnabled", value: boolean): void;
+  (e: "updateCustomBackgroundBlur", value: number): void;
+  (e: "updateCustomBackgroundScaleX", value: number): void;
+  (e: "updateCustomBackgroundScaleY", value: number): void;
+  (e: "pickCustomBackground"): void;
+  (e: "clearCustomBackground"): void;
 }>();
 
 const language = ref("en");
@@ -61,6 +73,11 @@ const hideOnStartup = ref(false);
 const useRelativePath = ref(false);
 const enableGroupDragSort = ref(false);
 const autoStart = ref(false);
+const customBackgroundEnabled = ref(false);
+const customBackgroundPath = ref("");
+const customBackgroundBlur = ref(12);
+const customBackgroundScaleX = ref(100);
+const customBackgroundScaleY = ref(100);
 const panelEl = ref<HTMLElement | null>(null);
 const panelX = ref(0);
 const panelY = ref(0);
@@ -172,6 +189,11 @@ watch(
     useRelativePath.value = props.useRelativePath;
     enableGroupDragSort.value = props.enableGroupDragSort;
     autoStart.value = props.autoStart;
+    customBackgroundEnabled.value = props.customBackgroundEnabled;
+    customBackgroundPath.value = props.customBackgroundPath;
+    customBackgroundBlur.value = props.customBackgroundBlur;
+    customBackgroundScaleX.value = props.customBackgroundScaleX;
+    customBackgroundScaleY.value = props.customBackgroundScaleY;
   },
   { immediate: true },
 );
@@ -278,6 +300,59 @@ function onAutoStartChange(ev: Event): void {
   emit("updateAutoStart", next);
 }
 
+function onCustomBackgroundEnabledChange(ev: Event): void {
+  const next = (ev.target as HTMLInputElement).checked;
+  customBackgroundEnabled.value = next;
+  emit("updateCustomBackgroundEnabled", next);
+}
+
+function onCustomBackgroundBlurInput(ev: Event): void {
+  const raw = (ev.target as HTMLInputElement).value;
+  const next = Number(raw);
+  if (!Number.isFinite(next)) return;
+  customBackgroundBlur.value = next;
+  emit("updateCustomBackgroundBlur", next);
+}
+
+function onCustomBackgroundScaleXInput(ev: Event): void {
+  const raw = (ev.target as HTMLInputElement).value;
+  const next = Number(raw);
+  if (!Number.isFinite(next)) return;
+  customBackgroundScaleX.value = next;
+  emit("updateCustomBackgroundScaleX", next);
+}
+
+function onCustomBackgroundScaleYInput(ev: Event): void {
+  const raw = (ev.target as HTMLInputElement).value;
+  const next = Number(raw);
+  if (!Number.isFinite(next)) return;
+  customBackgroundScaleY.value = next;
+  emit("updateCustomBackgroundScaleY", next);
+}
+
+function onCustomBackgroundScaleXNumber(ev: Event): void {
+  const raw = (ev.target as HTMLInputElement).value;
+  const next = Number(raw);
+  if (!Number.isFinite(next)) return;
+  customBackgroundScaleX.value = next;
+  emit("updateCustomBackgroundScaleX", next);
+}
+
+function onCustomBackgroundScaleYNumber(ev: Event): void {
+  const raw = (ev.target as HTMLInputElement).value;
+  const next = Number(raw);
+  if (!Number.isFinite(next)) return;
+  customBackgroundScaleY.value = next;
+  emit("updateCustomBackgroundScaleY", next);
+}
+
+function onResetBackgroundScale(): void {
+  customBackgroundScaleX.value = 100;
+  customBackgroundScaleY.value = 100;
+  emit("updateCustomBackgroundScaleX", 100);
+  emit("updateCustomBackgroundScaleY", 100);
+}
+
 function onApplyHotkey(): void {
   emit("applyHotkey", toggleHotkey.value);
 }
@@ -368,6 +443,112 @@ function onApplyHotkey(): void {
           />
           <div class="field__hint">{{ fontSize }}px</div>
         </label>
+
+        <label class="check">
+          <input
+            class="check__input"
+            type="checkbox"
+            :checked="customBackgroundEnabled"
+            @change="onCustomBackgroundEnabledChange"
+          />
+          <span class="check__label">{{ t("settings.background.enable") }}</span>
+        </label>
+
+        <label class="field">
+          <div class="field__label">{{ t("settings.background.path") }}</div>
+          <div class="settingsRow">
+            <input class="field__input settingsRow__input" :value="customBackgroundPath" readonly />
+            <button class="btn" type="button" @click="emit('pickCustomBackground')">
+              {{ t("settings.background.select") }}
+            </button>
+            <button class="btn" type="button" @click="emit('clearCustomBackground')">
+              {{ t("settings.background.clear") }}
+            </button>
+          </div>
+        </label>
+
+        <div v-if="customBackgroundPreview" class="backgroundPreview">
+          <img
+            class="backgroundPreview__image"
+            :src="customBackgroundPreview"
+            alt=""
+            :style="{
+              width: `${customBackgroundScaleX}%`,
+              height: `${customBackgroundScaleY}%`,
+            }"
+          />
+        </div>
+
+        <label class="field">
+          <div class="field__label">{{ t("settings.background.blur") }}</div>
+          <input
+            class="field__input field__input--range"
+            type="range"
+            min="0"
+            max="40"
+            step="1"
+            :value="customBackgroundBlur"
+            @input="onCustomBackgroundBlurInput"
+          />
+          <div class="field__hint">{{ customBackgroundBlur }}px</div>
+        </label>
+
+        <label class="field">
+          <div class="field__label">{{ t("settings.background.scaleX") }}</div>
+          <div class="settingsScaleRow">
+            <input
+              class="field__input field__input--range settingsScaleRow__range"
+              type="range"
+              min="50"
+              max="200"
+              step="1"
+              :value="customBackgroundScaleX"
+              @input="onCustomBackgroundScaleXInput"
+            />
+            <input
+              class="field__input settingsScaleRow__number"
+              type="number"
+              min="50"
+              max="200"
+              step="1"
+              :value="customBackgroundScaleX"
+              @input="onCustomBackgroundScaleXNumber"
+            />
+          </div>
+        </label>
+
+        <label class="field">
+          <div class="field__label">{{ t("settings.background.scaleY") }}</div>
+          <div class="settingsScaleRow">
+            <input
+              class="field__input field__input--range settingsScaleRow__range"
+              type="range"
+              min="50"
+              max="200"
+              step="1"
+              :value="customBackgroundScaleY"
+              @input="onCustomBackgroundScaleYInput"
+            />
+            <input
+              class="field__input settingsScaleRow__number"
+              type="number"
+              min="50"
+              max="200"
+              step="1"
+              :value="customBackgroundScaleY"
+              @input="onCustomBackgroundScaleYNumber"
+            />
+          </div>
+        </label>
+
+        <label class="field">
+          <div class="field__label">{{ t("settings.background.reset") }}</div>
+          <div class="settingsRow">
+            <button class="btn" type="button" @click="onResetBackgroundScale">
+              {{ t("settings.background.reset") }}
+            </button>
+          </div>
+        </label>
       </template>
 
       <template v-else-if="tab === 'layout'">
@@ -376,7 +557,7 @@ function onApplyHotkey(): void {
           <input
             class="field__input field__input--range"
             type="range"
-            min="90"
+            min="160"
             max="320"
             step="2"
             :value="sidebarWidth"

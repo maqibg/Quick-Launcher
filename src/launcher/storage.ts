@@ -153,6 +153,21 @@ function coerceLauncherState(value: unknown): LauncherState | null {
   if (typeof rawSettings.autoStart === "boolean") {
     settings.autoStart = rawSettings.autoStart;
   }
+  if (typeof rawSettings.customBackgroundEnabled === "boolean") {
+    settings.customBackgroundEnabled = rawSettings.customBackgroundEnabled;
+  }
+  if (typeof rawSettings.customBackgroundPath === "string") {
+    settings.customBackgroundPath = rawSettings.customBackgroundPath;
+  }
+  if (typeof rawSettings.customBackgroundBlur === "number" && Number.isFinite(rawSettings.customBackgroundBlur)) {
+    settings.customBackgroundBlur = Math.min(40, Math.max(0, Math.round(rawSettings.customBackgroundBlur)));
+  }
+  if (typeof rawSettings.customBackgroundScaleX === "number" && Number.isFinite(rawSettings.customBackgroundScaleX)) {
+    settings.customBackgroundScaleX = Math.min(200, Math.max(50, Math.round(rawSettings.customBackgroundScaleX)));
+  }
+  if (typeof rawSettings.customBackgroundScaleY === "number" && Number.isFinite(rawSettings.customBackgroundScaleY)) {
+    settings.customBackgroundScaleY = Math.min(200, Math.max(50, Math.round(rawSettings.customBackgroundScaleY)));
+  }
 
   const activeGroupId =
     typeof raw.activeGroupId === "string" &&

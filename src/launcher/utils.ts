@@ -28,7 +28,7 @@ export function createDefaultState(): LauncherState {
     cardHeight: 96,
     toggleHotkey: "",
     theme: "dark",
-    sidebarWidth: 140,
+    sidebarWidth: 160,
     fontFamily: "maye",
     fontSize: 13,
     cardFontSize: 11,
@@ -39,6 +39,11 @@ export function createDefaultState(): LauncherState {
     useRelativePath: false,
     enableGroupDragSort: true,
     autoStart: false,
+    customBackgroundEnabled: false,
+    customBackgroundPath: "",
+    customBackgroundBlur: 12,
+    customBackgroundScaleX: 100,
+    customBackgroundScaleY: 100,
   };
   const groups: Group[] = [
     { id: createId(), name: "Group-1", apps: [] },

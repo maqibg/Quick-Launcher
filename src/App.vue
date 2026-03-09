@@ -25,6 +25,11 @@ const {
   scriptState,
   builtinOpen,
   appStyle,
+  customBackgroundActive,
+  customBackgroundBlur,
+  customBackgroundScaleX,
+  customBackgroundScaleY,
+  backgroundImageUrl,
   filteredApps,
   isSearching,
   draggingAppId,
@@ -102,6 +107,12 @@ const {
   updateUseRelativePath,
   updateEnableGroupDragSort,
   updateAutoStart,
+  updateCustomBackgroundEnabled,
+  updateCustomBackgroundBlur,
+  updateCustomBackgroundScaleX,
+  updateCustomBackgroundScaleY,
+  pickCustomBackground,
+  clearCustomBackground,
   applyToggleHotkey,
   onMainBlankDoubleClick,
   draggingGroupId,
@@ -146,7 +157,33 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
 </script>
 
 <template>
-  <div class="app" :style="appStyle" :data-theme="state.settings.theme">
+  <div
+    class="app"
+    :class="{
+      'app--custom-background': customBackgroundActive,
+    }"
+    :style="appStyle"
+    :data-theme="state.settings.theme"
+  >
+    <div
+      v-if="customBackgroundActive"
+      class="app__background app__background--half"
+      aria-hidden="true"
+    >
+      <div
+        class="app__backgroundImage"
+        :style="{
+          backgroundImage: `url('${backgroundImageUrl}')`,
+          filter: `blur(${customBackgroundBlur}px)`,
+          backgroundSize: `${customBackgroundScaleX}% ${customBackgroundScaleY}%`,
+        }"
+      />
+      <div
+        class="app__backgroundShade"
+        :style="{ opacity: `${customBackgroundBlur <= 0 ? 0 : Math.min(0.14, customBackgroundBlur / 120)}` }"
+      />
+    </div>
+
     <TopBar
       :title="t('app.title')"
       v-model="search"
@@ -218,6 +255,8 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
       :kind="menu.kind"
       :x="menu.x"
       :y="menu.y"
+      :theme="state.settings.theme"
+      :app-style="appStyle"
       :groups="state.groups"
       :active-group-id="state.activeGroupId"
       :app-group-id="menuAppGroupId"
@@ -305,6 +344,12 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
       :use-relative-path="state.settings.useRelativePath"
       :enable-group-drag-sort="state.settings.enableGroupDragSort"
       :auto-start="state.settings.autoStart"
+      :custom-background-enabled="state.settings.customBackgroundEnabled"
+      :custom-background-path="state.settings.customBackgroundPath"
+      :custom-background-blur="state.settings.customBackgroundBlur"
+      :custom-background-scale-x="state.settings.customBackgroundScaleX"
+      :custom-background-scale-y="state.settings.customBackgroundScaleY"
+      :custom-background-preview="backgroundImageUrl"
       @close="closeSettings"
       @update-card-width="updateCardWidth"
       @update-card-height="updateCardHeight"
@@ -321,6 +366,12 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
       @update-use-relative-path="updateUseRelativePath"
       @update-enable-group-drag-sort="updateEnableGroupDragSort"
       @update-auto-start="updateAutoStart"
+      @update-custom-background-enabled="updateCustomBackgroundEnabled"
+      @update-custom-background-blur="updateCustomBackgroundBlur"
+      @update-custom-background-scale-x="updateCustomBackgroundScaleX"
+      @update-custom-background-scale-y="updateCustomBackgroundScaleY"
+      @pick-custom-background="pickCustomBackground"
+      @clear-custom-background="clearCustomBackground"
       @apply-hotkey="applyToggleHotkey"
     />
 

@@ -87,6 +87,42 @@ fn open_with_dialog(path: String) -> Result<(), String> {
     }
 }
 
+#[tauri::command]
+fn read_image_as_data_url(path: String) -> Result<String, String> {
+    use base64::Engine;
+
+    let resolved_path = paths::resolve_launch_path(&path);
+    if paths::is_special_path(&resolved_path) {
+        return Err("special path is not supported".to_string());
+    }
+    let image_path = Path::new(&resolved_path);
+    if !image_path.exists() || !image_path.is_file() {
+        return Err("file not found".to_string());
+    }
+
+    let ext = image_path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())
+        .unwrap_or_default();
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        _ => return Err("unsupported image format".to_string()),
+    };
+
+    let bytes = std::fs::read(image_path).map_err(|e| e.to_string())?;
+    Ok(format!(
+        "data:{};base64,{}",
+        mime,
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    ))
+}
+
 fn open_url(url: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
@@ -463,6 +499,7 @@ pub fn run() {
             set_toggle_hotkey,
             paths::make_relative_path,
             open_with_dialog,
+            read_image_as_data_url,
             open_app_folder,
             storage::load_launcher_state,
             storage::save_launcher_state,

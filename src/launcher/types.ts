@@ -36,6 +36,11 @@ export type UiSettings = {
   useRelativePath: boolean;
   enableGroupDragSort: boolean;
   autoStart: boolean;
+  customBackgroundEnabled: boolean;
+  customBackgroundPath: string;
+  customBackgroundBlur: number;
+  customBackgroundScaleX: number;
+  customBackgroundScaleY: number;
 };
 
 export type LauncherState = {

@@ -61,6 +61,16 @@ pub struct UiSettings {
     pub enable_group_drag_sort: bool,
     #[serde(rename = "autoStart", default)]
     pub auto_start: bool,
+    #[serde(rename = "customBackgroundEnabled", default)]
+    pub custom_background_enabled: bool,
+    #[serde(rename = "customBackgroundPath", default)]
+    pub custom_background_path: String,
+    #[serde(rename = "customBackgroundBlur", default = "default_custom_background_blur")]
+    pub custom_background_blur: u32,
+    #[serde(rename = "customBackgroundScaleX", default = "default_custom_background_scale")]
+    pub custom_background_scale_x: u32,
+    #[serde(rename = "customBackgroundScaleY", default = "default_custom_background_scale")]
+    pub custom_background_scale_y: u32,
 }
 
 fn default_language() -> String {
@@ -76,7 +86,7 @@ fn default_theme() -> String {
 }
 
 fn default_sidebar_width() -> u32 {
-    140
+    160
 }
 
 fn default_font_family() -> String {
@@ -115,6 +125,14 @@ fn default_enable_group_drag_sort() -> bool {
     false
 }
 
+fn default_custom_background_blur() -> u32 {
+    12
+}
+
+fn default_custom_background_scale() -> u32 {
+    100
+}
+
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
@@ -134,6 +152,11 @@ impl Default for UiSettings {
             use_relative_path: default_use_relative_path(),
             enable_group_drag_sort: default_enable_group_drag_sort(),
             auto_start: false,
+            custom_background_enabled: false,
+            custom_background_path: String::new(),
+            custom_background_blur: default_custom_background_blur(),
+            custom_background_scale_x: default_custom_background_scale(),
+            custom_background_scale_y: default_custom_background_scale(),
         }
     }
 }
