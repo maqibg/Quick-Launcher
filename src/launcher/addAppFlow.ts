@@ -72,6 +72,7 @@ export function createAddAppFlow(opts: {
       name,
       path: uwpPath,
       args: "",
+      runAsAdmin: false,
       icon: undefined,
       addedAt: Date.now(),
     };

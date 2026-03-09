@@ -12,6 +12,7 @@ type Props = {
   y: number;
   groups?: Group[];
   activeGroupId?: string;
+  appGroupId?: string;
 };
 
 const props = defineProps<Props>();
@@ -65,17 +66,25 @@ onUnmounted(() => {
   window.removeEventListener("resize", onResize);
 });
 
-const moveTargetGroups = computed(() =>
-  (props.groups ?? []).filter((g) => g.id !== props.activeGroupId)
-);
+const menuTargetGroups = computed(() => {
+  const excludedGroupId =
+    props.kind === "app" ? (props.appGroupId ?? props.activeGroupId) : props.activeGroupId;
+  return (props.groups ?? []).filter((g) => g.id !== excludedGroupId);
+});
 
 const emit = defineEmits<{
   (e: "addApp"): void;
   (e: "addUwpApp"): void;
+  (e: "addUrl"): void;
+  (e: "addScript"): void;
+  (e: "addBuiltin"): void;
   (e: "addGroup"): void;
   (e: "openApp"): void;
+  (e: "runAsAdmin"): void;
+  (e: "openWith"): void;
   (e: "openAppFolder"): void;
   (e: "editApp"): void;
+  (e: "copyToGroup", groupId: string): void;
   (e: "removeApp"): void;
   (e: "moveToGroup", groupId: string): void;
   (e: "renameGroup"): void;
@@ -100,6 +109,15 @@ const emit = defineEmits<{
       <button class="menu__item" type="button" @click="emit('addUwpApp')">
         {{ t("menu.addUwpApp") }}
       </button>
+      <button class="menu__item" type="button" @click="emit('addUrl')">
+        {{ t("menu.addUrl") }}
+      </button>
+      <button class="menu__item" type="button" @click="emit('addScript')">
+        {{ t("menu.addScript") }}
+      </button>
+      <button class="menu__item" type="button" @click="emit('addBuiltin')">
+        {{ t("menu.addBuiltin") }}
+      </button>
     </template>
 
     <template v-else-if="kind === 'blankSidebar'">
@@ -112,21 +130,44 @@ const emit = defineEmits<{
       <button class="menu__item" type="button" @click="emit('openApp')">
         {{ t("menu.open") }}
       </button>
+      <button class="menu__item" type="button" @click="emit('runAsAdmin')">
+        {{ t("menu.runAsAdmin") }}
+      </button>
+      <button class="menu__item" type="button" @click="emit('openWith')">
+        {{ t("menu.openWith") }}
+      </button>
       <button class="menu__item" type="button" @click="emit('openAppFolder')">
         {{ t("menu.openFolder") }}
       </button>
       <button class="menu__item" type="button" @click="emit('editApp')">
         {{ t("menu.edit") }}
       </button>
-      <div v-if="groups && groups.length > 1" class="menu__separator" />
-      <div v-if="groups && groups.length > 1" class="menu__sub">
+      <div v-if="menuTargetGroups.length > 0" class="menu__separator" />
+      <div v-if="menuTargetGroups.length > 0" class="menu__sub">
+        <button class="menu__item" type="button">
+          {{ t("menu.copyTo") }}
+          <span class="menu__arrow">&#9656;</span>
+        </button>
+        <div class="menu__sub-panel">
+          <button
+            v-for="g in menuTargetGroups"
+            :key="`copy-${g.id}`"
+            class="menu__item"
+            type="button"
+            @click="emit('copyToGroup', g.id)"
+          >
+            {{ g.name }}
+          </button>
+        </div>
+      </div>
+      <div v-if="menuTargetGroups.length > 0" class="menu__sub">
         <button class="menu__item" type="button">
           {{ t("menu.moveTo") }}
           <span class="menu__arrow">&#9656;</span>
         </button>
         <div class="menu__sub-panel">
           <button
-            v-for="g in moveTargetGroups"
+            v-for="g in menuTargetGroups"
             :key="g.id"
             class="menu__item"
             type="button"

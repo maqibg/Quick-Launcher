@@ -2,7 +2,11 @@ use std::path::{Path, PathBuf};
 
 pub(crate) fn is_special_path(path: &str) -> bool {
     let lower = path.trim().to_ascii_lowercase();
-    lower.starts_with("shell:") || lower.starts_with("uwp:")
+    lower.starts_with("shell:")
+        || lower.starts_with("uwp:")
+        || lower.starts_with("url:")
+        || lower.starts_with("script:")
+        || lower.starts_with("builtin:")
 }
 
 pub(crate) fn app_base_dir() -> Option<PathBuf> {

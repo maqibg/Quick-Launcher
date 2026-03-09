@@ -3,6 +3,10 @@ export type AppEntry = {
   name: string;
   path: string;
   args?: string;
+  runAsAdmin: boolean;
+  keywords?: string;
+  note?: string;
+  content?: string;
   icon?: string;
   addedAt: number;
 };

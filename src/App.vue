@@ -6,6 +6,9 @@ import ContextMenu from "./components/ContextMenu.vue";
 import AppEditorModal from "./components/AppEditorModal.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import AddAppModal from "./components/AddAppModal.vue";
+import NewUrlModal from "./components/NewUrlModal.vue";
+import NewScriptModal from "./components/NewScriptModal.vue";
+import BuiltinItemsModal from "./components/BuiltinItemsModal.vue";
 import GroupRenameModal from "./components/GroupRenameModal.vue";
 import SelectionBar from "./components/SelectionBar.vue";
 import { useLauncherModel } from "./launcher/useLauncherModel";
@@ -18,6 +21,9 @@ const {
   toast,
   settingsOpen,
   addAppOpen,
+  urlState,
+  scriptState,
+  builtinOpen,
   appStyle,
   filteredApps,
   isSearching,
@@ -40,13 +46,20 @@ const {
   menuAddApp,
   menuAddUwpApp,
   menuAddGroup,
+  menuAddUrl,
+  menuAddScript,
+  menuAddBuiltin,
   menuOpenApp,
+  menuRunAsAdmin,
+  menuOpenWith,
   menuOpenAppFolder,
   menuEditApp,
+  menuCopyToGroup,
   menuRemoveApp,
   menuMoveToGroup,
   menuRenameGroup,
   menuRemoveGroup,
+  menuAppGroupId,
   onMouseDownApp,
   onExternalDragOverBlank,
   onExternalDragOverApp,
@@ -62,6 +75,13 @@ const {
   closeEditor,
   applyEditorUpdate,
   closeAddApp,
+  closeUrl,
+  saveUrl,
+  closeScript,
+  saveScript,
+  closeBuiltin,
+  addBuiltin,
+  builtinItems,
   addUwpToActiveGroup,
   closeRenameGroup,
   saveRenameGroup,
@@ -200,12 +220,19 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
       :y="menu.y"
       :groups="state.groups"
       :active-group-id="state.activeGroupId"
+      :app-group-id="menuAppGroupId"
       @add-app="menuAddApp"
       @add-uwp-app="menuAddUwpApp"
+      @add-url="menuAddUrl"
+      @add-script="menuAddScript"
+      @add-builtin="menuAddBuiltin"
       @add-group="menuAddGroup"
       @open-app="menuOpenApp"
+      @run-as-admin="menuRunAsAdmin"
+      @open-with="menuOpenWith"
       @open-app-folder="menuOpenAppFolder"
       @edit-app="menuEditApp"
+      @copy-to-group="menuCopyToGroup"
       @remove-app="menuRemoveApp"
       @move-to-group="menuMoveToGroup"
       @rename-group="menuRenameGroup"
@@ -218,8 +245,39 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
       :name="editor.name"
       :path="editor.path"
       :args="editor.args"
+      :run-as-admin="editor.runAsAdmin"
+      :keywords="editor.keywords"
+      :note="editor.note"
+      :content="editor.content"
       @close="closeEditor"
       @save="applyEditorUpdate"
+    />
+
+    <NewUrlModal
+      :open="urlState.open"
+      :name="urlState.name"
+      :target="urlState.target"
+      :keywords="urlState.keywords"
+      :note="urlState.note"
+      @close="closeUrl"
+      @save="saveUrl"
+    />
+
+    <NewScriptModal
+      :open="scriptState.open"
+      :name="scriptState.name"
+      :keywords="scriptState.keywords"
+      :note="scriptState.note"
+      :content="scriptState.content"
+      @close="closeScript"
+      @save="saveScript"
+    />
+
+    <BuiltinItemsModal
+      :open="builtinOpen"
+      :items="builtinItems"
+      @close="closeBuiltin"
+      @select="addBuiltin"
     />
 
     <GroupRenameModal

@@ -7,6 +7,10 @@ export type EditorState = {
   name: string;
   path: string;
   args: string;
+  runAsAdmin: boolean;
+  keywords: string;
+  note: string;
+  content: string;
 };
 
 export function createAppEditorModel(opts: {
@@ -21,6 +25,10 @@ export function createAppEditorModel(opts: {
     name: "",
     path: "",
     args: "",
+    runAsAdmin: false,
+    keywords: "",
+    note: "",
+    content: "",
   });
 
   function openEditor(entry: AppEntry): void {
@@ -29,6 +37,10 @@ export function createAppEditorModel(opts: {
     editor.name = entry.name;
     editor.path = entry.path;
     editor.args = entry.args ?? "";
+    editor.runAsAdmin = entry.runAsAdmin;
+    editor.keywords = entry.keywords ?? "";
+    editor.note = entry.note ?? "";
+    editor.content = entry.content ?? "";
   }
 
   function closeEditor(): void {
@@ -52,6 +64,10 @@ export function createAppEditorModel(opts: {
       entry.path = nextPath;
     }
     entry.args = editor.args;
+    entry.runAsAdmin = editor.runAsAdmin;
+    entry.keywords = editor.keywords.trim();
+    entry.note = editor.note.trim();
+    entry.content = editor.content || undefined;
     closeEditor();
     opts.onStructureChanged?.();
     opts.scheduleSave();
@@ -61,10 +77,18 @@ export function createAppEditorModel(opts: {
     name: string;
     path: string;
     args: string;
+    runAsAdmin: boolean;
+    keywords: string;
+    note: string;
+    content: string;
   }): void {
     editor.name = payload.name;
     editor.path = payload.path;
     editor.args = payload.args;
+    editor.runAsAdmin = payload.runAsAdmin;
+    editor.keywords = payload.keywords;
+    editor.note = payload.note;
+    editor.content = payload.content;
     saveEditor();
   }
 

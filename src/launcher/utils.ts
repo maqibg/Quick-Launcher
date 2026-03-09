@@ -77,6 +77,7 @@ export function addAppsToGroup(group: Group, filePaths: string[], insertAt?: num
       name: suggestAppName(p),
       path: p,
       args: "",
+      runAsAdmin: false,
       icon: undefined,
       addedAt: now,
     });

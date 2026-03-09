@@ -50,6 +50,10 @@ function coerceLauncherState(value: unknown): LauncherState | null {
             name?: unknown;
             path?: unknown;
             args?: unknown;
+            runAsAdmin?: unknown;
+            keywords?: unknown;
+            note?: unknown;
+            content?: unknown;
             icon?: unknown;
             addedAt?: unknown;
           };
@@ -64,12 +68,27 @@ function coerceLauncherState(value: unknown): LauncherState | null {
               ? appRaw.name
               : suggestAppName(path);
           const args = typeof appRaw.args === "string" ? appRaw.args : "";
+          const runAsAdmin = appRaw.runAsAdmin === true;
+          const keywords = typeof appRaw.keywords === "string" ? appRaw.keywords : "";
+          const note = typeof appRaw.note === "string" ? appRaw.note : "";
+          const content = typeof appRaw.content === "string" ? appRaw.content : undefined;
           const icon = typeof appRaw.icon === "string" ? appRaw.icon : undefined;
           const addedAt =
             typeof appRaw.addedAt === "number" && Number.isFinite(appRaw.addedAt)
               ? appRaw.addedAt
               : Date.now();
-          return { id: appId, name: appName, path, args, icon, addedAt };
+          return {
+            id: appId,
+            name: appName,
+            path,
+            args,
+            runAsAdmin,
+            keywords,
+            note,
+            content,
+            icon,
+            addedAt,
+          };
         })
         .filter((x: AppEntry | null): x is AppEntry => x !== null);
       return { id, name, apps };

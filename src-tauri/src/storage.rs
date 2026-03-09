@@ -152,6 +152,14 @@ pub struct AppEntry {
     pub path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub args: Option<String>,
+    #[serde(rename = "runAsAdmin", default)]
+    pub run_as_admin: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keywords: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
     #[serde(rename = "addedAt")]
@@ -252,6 +260,10 @@ CREATE TABLE IF NOT EXISTS apps (
   name TEXT NOT NULL,
   path TEXT NOT NULL,
   args TEXT NOT NULL,
+  run_as_admin INTEGER NOT NULL DEFAULT 0,
+  keywords TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL DEFAULT '',
   icon TEXT NOT NULL DEFAULT '',
   position INTEGER NOT NULL,
   added_at INTEGER NOT NULL,
@@ -284,6 +296,49 @@ CREATE TABLE IF NOT EXISTS app_icons (
         .unwrap_or(0);
     if has_icon == 0 {
         let _ = conn.execute("ALTER TABLE apps ADD COLUMN icon TEXT NOT NULL DEFAULT ''", []);
+    }
+    let has_run_as_admin: i64 = conn
+        .query_row(
+            "SELECT COUNT(1) FROM pragma_table_info('apps') WHERE name = 'run_as_admin'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if has_run_as_admin == 0 {
+        let _ = conn.execute(
+            "ALTER TABLE apps ADD COLUMN run_as_admin INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
+    }
+    let has_keywords: i64 = conn
+        .query_row(
+            "SELECT COUNT(1) FROM pragma_table_info('apps') WHERE name = 'keywords'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if has_keywords == 0 {
+        let _ = conn.execute("ALTER TABLE apps ADD COLUMN keywords TEXT NOT NULL DEFAULT ''", []);
+    }
+    let has_note: i64 = conn
+        .query_row(
+            "SELECT COUNT(1) FROM pragma_table_info('apps') WHERE name = 'note'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if has_note == 0 {
+        let _ = conn.execute("ALTER TABLE apps ADD COLUMN note TEXT NOT NULL DEFAULT ''", []);
+    }
+    let has_content: i64 = conn
+        .query_row(
+            "SELECT COUNT(1) FROM pragma_table_info('apps') WHERE name = 'content'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if has_content == 0 {
+        let _ = conn.execute("ALTER TABLE apps ADD COLUMN content TEXT NOT NULL DEFAULT ''", []);
     }
     Ok(conn)
 }
@@ -326,7 +381,7 @@ pub fn load_launcher_state(app: tauri::AppHandle) -> Result<Option<LauncherState
 
     let mut apps_stmt = conn
         .prepare(
-            "SELECT a.id, a.group_id, a.name, a.path, a.args, COALESCE(i.icon, a.icon) as icon, a.added_at
+            "SELECT a.id, a.group_id, a.name, a.path, a.args, a.run_as_admin, a.keywords, a.note, a.content, COALESCE(i.icon, a.icon) as icon, a.added_at
              FROM apps a
              LEFT JOIN app_icons i ON a.id = i.app_id
              ORDER BY a.position ASC",
@@ -340,22 +395,34 @@ pub fn load_launcher_state(app: tauri::AppHandle) -> Result<Option<LauncherState
                 row.get::<_, String>(2)?,
                 row.get::<_, String>(3)?,
                 row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
-                row.get::<_, i64>(6)?,
+                row.get::<_, i64>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
+                row.get::<_, String>(8)?,
+                row.get::<_, String>(9)?,
+                row.get::<_, i64>(10)?,
             ))
         })
         .map_err(|e| e.to_string())?;
 
     let mut apps_by_group: HashMap<String, Vec<AppEntry>> = HashMap::new();
     for row in app_rows {
-        let (id, group_id, name, path, args, icon, added_at) = row.map_err(|e| e.to_string())?;
+        let (id, group_id, name, path, args, run_as_admin, keywords, note, content, icon, added_at) =
+            row.map_err(|e| e.to_string())?;
         let args_opt = if args.trim().is_empty() { None } else { Some(args) };
+        let keywords_opt = if keywords.trim().is_empty() { None } else { Some(keywords) };
+        let note_opt = if note.trim().is_empty() { None } else { Some(note) };
+        let content_opt = if content.trim().is_empty() { None } else { Some(content) };
         let icon_opt = if icon.trim().is_empty() { None } else { Some(icon) };
         apps_by_group.entry(group_id).or_default().push(AppEntry {
             id,
             name,
             path,
             args: args_opt,
+            run_as_admin: run_as_admin != 0,
+            keywords: keywords_opt,
+            note: note_opt,
+            content: content_opt,
             icon: icon_opt,
             added_at,
         });
@@ -425,21 +492,29 @@ pub fn save_launcher_state(app: tauri::AppHandle, state: LauncherState) -> Resul
         for (app_pos, app_entry) in group.apps.iter().enumerate() {
             new_app_ids.insert(app_entry.id.clone());
             tx.execute(
-                "INSERT INTO apps(id, group_id, name, path, args, icon, position, added_at)
-                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                "INSERT INTO apps(id, group_id, name, path, args, run_as_admin, keywords, note, content, icon, position, added_at)
+                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
                  ON CONFLICT(id) DO UPDATE SET
                    group_id = excluded.group_id,
                    name = excluded.name,
                    path = excluded.path,
                    args = excluded.args,
+                   run_as_admin = excluded.run_as_admin,
+                   keywords = excluded.keywords,
+                   note = excluded.note,
+                   content = excluded.content,
                    icon = excluded.icon,
-                   position = excluded.position",
+                    position = excluded.position",
                 params![
                     app_entry.id,
                     group.id,
                     app_entry.name,
                     app_entry.path,
                     app_entry.args.as_deref().unwrap_or(""),
+                    app_entry.run_as_admin,
+                    app_entry.keywords.as_deref().unwrap_or(""),
+                    app_entry.note.as_deref().unwrap_or(""),
+                    app_entry.content.as_deref().unwrap_or(""),
                     app_entry.icon.as_deref().unwrap_or(""),
                     app_pos as i64,
                     app_entry.added_at

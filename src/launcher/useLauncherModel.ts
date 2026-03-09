@@ -6,6 +6,8 @@ import { loadState, saveState } from "./storage";
 import type { AppEntry, Group, LauncherState } from "./types";
 import { createAppEditorModel } from "./appEditorModel";
 import { createAddAppFlow, isUwpPath, UWP_PREFIX } from "./addAppFlow";
+import { createCustomEntryModels } from "./customEntryModels";
+import { isBuiltinEntry, isScriptEntry, isUrlEntry } from "./customEntries";
 import { createGroupRenameModel } from "./groupRenameModel";
 import { createExternalFileDropPreview } from "./externalFileDropPreview";
 import { createInternalCardDrag } from "./internalCardDrag";
@@ -80,8 +82,8 @@ export function useLauncherModel() {
     const index = new Map<string, Set<string>>();
     for (const group of state.groups) {
       for (const app of group.apps) {
-        const nameLower = app.name.toLowerCase();
-        const terms = [nameLower, ...nameLower.split(/[\s\-_\.]+/)];
+        const searchable = `${app.name} ${app.keywords ?? ""}`.toLowerCase();
+        const terms = [searchable, ...searchable.split(/[\s\-_\.]+/)];
         for (const term of terms) {
           if (!term) continue;
           if (!index.has(term)) index.set(term, new Set());
@@ -239,6 +241,28 @@ export function useLauncherModel() {
   });
   const pickAndAddApps = pickAndAddDesktopApps;
 
+  const {
+    url,
+    script,
+    builtinOpen,
+    builtinItems,
+    openUrl,
+    closeUrl,
+    saveUrl,
+    openScript,
+    closeScript,
+    saveScript,
+    openBuiltin,
+    closeBuiltin,
+    addBuiltin,
+  } = createCustomEntryModels({
+    getActiveGroup: () => activeGroup.value,
+    hydrateEntryIcons,
+    scheduleSave,
+    showToast,
+    onStructureChanged: rebuildSearchIndex,
+  });
+
   function setActiveGroup(id: string): void {
     if (internalDrag.shouldSuppressClick()) return;
     if (Date.now() < suppressGroupClickUntil) return;
@@ -322,19 +346,29 @@ export function useLauncherModel() {
     return insertAt !== fromIndex;
   }
 
-  async function launch(entry: AppEntry): Promise<void> {
+  async function launch(entry: AppEntry, options?: { runAsAdmin?: boolean }): Promise<void> {
     if (internalDrag.shouldSuppressClick()) return;
     if (!isTauriRuntime()) {
       showToast(t("error.tauriRuntimeRequired"));
       return;
     }
+    const runAsAdmin = options?.runAsAdmin ?? entry.runAsAdmin;
     try {
       if (isUwpPath(entry.path)) {
+        if (runAsAdmin) {
+          showToast(t("error.adminRunUnsupported"));
+          return;
+        }
         const appId = entry.path.slice(UWP_PREFIX.length);
         await invoke("spawn_uwp_app", { appId });
       } else {
-        const argText = (entry.args ?? "").trim();
-        await invoke("spawn_app", { path: entry.path, args: parseArgs(argText) });
+        const argText = isScriptEntry(entry.path) ? "" : (entry.args ?? "").trim();
+        await invoke("spawn_app", {
+          path: entry.path,
+          args: parseArgs(argText),
+          content: entry.content ?? null,
+          runAsAdmin,
+        });
       }
     } catch (e) {
       const details =
@@ -356,7 +390,16 @@ export function useLauncherModel() {
   const pendingIcons = new Map<string, Promise<string | null>>();
 
   async function loadIcon(entry: AppEntry): Promise<void> {
-    if (entry.icon || !tauriRuntime) return;
+    if (!tauriRuntime) return;
+    if (isUrlEntry(entry.path) || isScriptEntry(entry.path)) return;
+
+    const isBuiltin = isBuiltinEntry(entry.path);
+    if (
+      entry.icon &&
+      (!isBuiltin || !entry.icon.startsWith("data:image/svg+xml,"))
+    ) {
+      return;
+    }
 
     const lookupPath = isUwpPath(entry.path)
       ? `shell:AppsFolder\\${entry.path.slice(UWP_PREFIX.length)}`
@@ -473,6 +516,8 @@ export function useLauncherModel() {
     return undefined;
   }
 
+  const menuAppGroupId = computed(() => findAppById(menu.targetId)?.group.id);
+
   function getMenuApp(): AppEntry | undefined {
     return findAppById(menu.targetId)?.app;
   }
@@ -490,6 +535,21 @@ export function useLauncherModel() {
     closeMenu();
   }
 
+  function menuAddUrl(): void {
+    openUrl();
+    closeMenu();
+  }
+
+  function menuAddScript(): void {
+    openScript();
+    closeMenu();
+  }
+
+  function menuAddBuiltin(): void {
+    openBuiltin();
+    closeMenu();
+  }
+
   function menuAddGroup(): void {
     addGroup();
     closeMenu();
@@ -497,8 +557,41 @@ export function useLauncherModel() {
 
   function menuOpenApp(): void {
     const entry = getMenuApp();
-    if (entry) launch(entry);
+    if (entry) void launch(entry);
     closeMenu();
+  }
+
+  function menuRunAsAdmin(): void {
+    const entry = getMenuApp();
+    if (entry) void launch(entry, { runAsAdmin: true });
+    closeMenu();
+  }
+
+  async function menuOpenWith(): Promise<void> {
+    const entry = getMenuApp();
+    if (!entry) return;
+    if (!tauriRuntime) {
+      showToast(t("error.tauriRuntimeRequired"));
+      closeMenu();
+      return;
+    }
+    if (
+      isUwpPath(entry.path) ||
+      isUrlEntry(entry.path) ||
+      isScriptEntry(entry.path) ||
+      isBuiltinEntry(entry.path)
+    ) {
+      showToast(t("error.desktopAppOnly"));
+      closeMenu();
+      return;
+    }
+    try {
+      await invoke("open_with_dialog", { path: entry.path });
+    } catch (e) {
+      showToast(t("error.openWithFailed", { error: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      closeMenu();
+    }
   }
 
   async function menuOpenAppFolder(): Promise<void> {
@@ -550,6 +643,27 @@ export function useLauncherModel() {
     found.group.apps = found.group.apps.filter((a) => a.id !== found.app.id);
     target.apps.push(found.app);
     scheduleSave();
+    closeMenu();
+  }
+
+  function menuCopyToGroup(targetGroupId: string): void {
+    const found = findAppById(menu.targetId);
+    if (!found) { closeMenu(); return; }
+    const target = state.groups.find((g) => g.id === targetGroupId);
+    if (!target) { closeMenu(); return; }
+    if (target.apps.some((a) => a.path === found.app.path)) {
+      showToast(t("toast.alreadyInGroup", { group: target.name }));
+      closeMenu();
+      return;
+    }
+    target.apps.push({
+      ...found.app,
+      id: createId(),
+      addedAt: Date.now(),
+    });
+    rebuildSearchIndex();
+    scheduleSave();
+    showToast(t("toast.copiedToGroup", { group: target.name }));
     closeMenu();
   }
 
@@ -1135,12 +1249,14 @@ export function useLauncherModel() {
 
   return {
     tauriRuntime, state, search, toast,
-    settingsOpen, addAppOpen, appStyle, filteredApps, isSearching,
+    settingsOpen, addAppOpen, urlState: url, scriptState: script, builtinOpen, builtinItems,
+    appStyle, filteredApps, isSearching,
     menu, editor, rename, setActiveGroup, launch,
     selectedAppIds, onAppClick, clearSelection, removeSelectedApps, moveSelectedToGroup,
-    openMenu, closeMenu, menuAddApp, menuAddUwpApp, menuAddGroup,
-    menuOpenApp, menuOpenAppFolder, menuEditApp, menuRemoveApp, menuMoveToGroup, menuRenameGroup, menuRemoveGroup,
-    pickAndAddApps, openAddApp, closeAddApp, addUwpToActiveGroup,
+    openMenu, closeMenu, menuAddApp, menuAddUwpApp, menuAddUrl, menuAddScript, menuAddBuiltin, menuAddGroup,
+    menuOpenApp, menuRunAsAdmin, menuOpenWith, menuOpenAppFolder, menuEditApp, menuCopyToGroup, menuRemoveApp,
+    menuMoveToGroup, menuRenameGroup, menuRemoveGroup, menuAppGroupId,
+    pickAndAddApps, openAddApp, closeAddApp, closeUrl, saveUrl, closeScript, saveScript, closeBuiltin, addBuiltin, addUwpToActiveGroup,
     addGroup, removeGroup,
     minimizeWindow, toggleMaximizeWindow, closeWindow, startWindowDragging,
     closeEditor, applyEditorUpdate, openSettings, closeSettings,
