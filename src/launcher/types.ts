@@ -27,6 +27,7 @@ export type UiSettings = {
   theme: "dark" | "light";
   sidebarWidth: number;
   fontFamily: string;
+  fontColor: string;
   fontSize: number;
   cardFontSize: number;
   cardIconScale: number;

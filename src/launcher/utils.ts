@@ -30,6 +30,7 @@ export function createDefaultState(): LauncherState {
     theme: "dark",
     sidebarWidth: 160,
     fontFamily: "maye",
+    fontColor: "",
     fontSize: 13,
     cardFontSize: 11,
     cardIconScale: 56,

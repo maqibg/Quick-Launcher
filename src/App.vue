@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import TopBar from "./components/TopBar.vue";
 import Sidebar from "./components/Sidebar.vue";
 import AppGrid from "./components/AppGrid.vue";
@@ -96,6 +97,8 @@ const {
   updateCardHeight,
   updateSidebarWidth,
   updateFontFamily,
+  updateFontColor,
+  resetFontColor,
   updateFontSize,
   updateCardFontSize,
   updateCardIconScale,
@@ -126,6 +129,112 @@ const {
   invalidGroup,
   validateAll,
 } = useLauncherModel();
+
+const DEFAULT_TOPBAR_HEIGHT = 44;
+const appRoot = ref<HTMLElement | null>(null);
+const appSize = ref({ width: 0, height: 0 });
+
+let appResizeObserver: ResizeObserver | null = null;
+
+const sidebarWidth = computed(() => {
+  const rawWidth = appStyle.value["--sidebar-width"];
+  const parsedWidth = Number.parseFloat(rawWidth ?? "");
+  if (Number.isFinite(parsedWidth)) {
+    return parsedWidth;
+  }
+  return state.settings.sidebarWidth;
+});
+
+const topbarHeight = computed(() => {
+  const root = appRoot.value;
+  if (!root) {
+    return DEFAULT_TOPBAR_HEIGHT;
+  }
+  const rawHeight = getComputedStyle(root).getPropertyValue("--topbar-height");
+  const parsedHeight = Number.parseFloat(rawHeight);
+  return Number.isFinite(parsedHeight) ? parsedHeight : DEFAULT_TOPBAR_HEIGHT;
+});
+
+const mainBackgroundStyle = computed<Record<string, string>>(() => ({
+  backgroundImage: `url('${backgroundImageUrl.value}')`,
+  filter: `blur(${customBackgroundBlur.value}px)`,
+  backgroundSize: `${customBackgroundScaleX.value}% ${customBackgroundScaleY.value}%`,
+}));
+
+const projectedBackgroundFrame = computed(() => {
+  const width = appSize.value.width;
+  const height = appSize.value.height;
+  const sidebar = Math.max(0, Math.min(sidebarWidth.value, width));
+  const topbar = Math.max(0, Math.min(topbarHeight.value, height));
+  const mainWidth = Math.max(0, width - sidebar);
+  const mainHeight = Math.max(0, height - topbar);
+  const imageWidth = (mainWidth * customBackgroundScaleX.value) / 100;
+  const imageHeight = (mainHeight * customBackgroundScaleY.value) / 100;
+
+  return {
+    left: sidebar + (mainWidth - imageWidth) / 2,
+    top: topbar + (mainHeight - imageHeight) / 2,
+    width: imageWidth,
+    height: imageHeight,
+    topbar,
+  };
+});
+
+function toPixel(value: number): string {
+  return `${Math.round(value * 100) / 100}px`;
+}
+
+function buildProjectedBackgroundStyle(offsetTop: number): Record<string, string> {
+  const frame = projectedBackgroundFrame.value;
+  return {
+    left: toPixel(frame.left),
+    top: toPixel(frame.top - offsetTop),
+    width: toPixel(frame.width),
+    height: toPixel(frame.height),
+    backgroundImage: `url('${backgroundImageUrl.value}')`,
+    filter: `blur(${customBackgroundBlur.value}px)`,
+  };
+}
+
+const topbarBackgroundStyle = computed<Record<string, string>>(() => {
+  return buildProjectedBackgroundStyle(0);
+});
+
+const sidebarBackgroundStyle = computed<Record<string, string>>(() => {
+  return buildProjectedBackgroundStyle(projectedBackgroundFrame.value.topbar);
+});
+
+function syncAppSize(): void {
+  const root = appRoot.value;
+  if (!root) {
+    appSize.value = { width: 0, height: 0 };
+    return;
+  }
+  appSize.value = {
+    width: root.clientWidth,
+    height: root.clientHeight,
+  };
+}
+
+onMounted(() => {
+  syncAppSize();
+  if (typeof ResizeObserver === "undefined" || !appRoot.value) {
+    window.addEventListener("resize", syncAppSize);
+    return;
+  }
+  appResizeObserver = new ResizeObserver(() => {
+    syncAppSize();
+  });
+  appResizeObserver.observe(appRoot.value);
+});
+
+onUnmounted(() => {
+  if (appResizeObserver) {
+    appResizeObserver.disconnect();
+    appResizeObserver = null;
+  }
+  window.removeEventListener("resize", syncAppSize);
+});
 
 function onSidebarBlank(ev: MouseEvent): void {
   openMenu("blankSidebar", ev);
@@ -158,31 +267,28 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
 
 <template>
   <div
+    ref="appRoot"
     class="app"
     :class="{
       'app--custom-background': customBackgroundActive,
     }"
     :style="appStyle"
     :data-theme="state.settings.theme"
-  >
-    <div
-      v-if="customBackgroundActive"
-      class="app__background app__background--half"
-      aria-hidden="true"
     >
-      <div
-        class="app__backgroundImage"
-        :style="{
-          backgroundImage: `url('${backgroundImageUrl}')`,
-          filter: `blur(${customBackgroundBlur}px)`,
-          backgroundSize: `${customBackgroundScaleX}% ${customBackgroundScaleY}%`,
-        }"
-      />
-      <div
-        class="app__backgroundShade"
-        :style="{ opacity: `${customBackgroundBlur <= 0 ? 0 : Math.min(0.14, customBackgroundBlur / 120)}` }"
-      />
-    </div>
+      <div v-if="customBackgroundActive" class="app__background app__background--topbar" aria-hidden="true">
+        <div class="app__backgroundImage app__backgroundImage--projected" :style="topbarBackgroundStyle" />
+      </div>
+
+      <div v-if="customBackgroundActive" class="app__background app__background--sidebar" aria-hidden="true">
+        <div class="app__backgroundImage app__backgroundImage--projected" :style="sidebarBackgroundStyle" />
+      </div>
+
+      <div v-if="customBackgroundActive" class="app__background app__background--main" aria-hidden="true">
+        <div
+          class="app__backgroundImage"
+          :style="mainBackgroundStyle"
+        />
+      </div>
 
     <TopBar
       :title="t('app.title')"
@@ -335,6 +441,8 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
       :theme="state.settings.theme"
       :sidebar-width="state.settings.sidebarWidth"
       :font-family="state.settings.fontFamily"
+      :font-color="state.settings.fontColor"
+      :resolved-font-color="appStyle['--text'] ?? '#e9edf3'"
       :font-size="state.settings.fontSize"
       :card-font-size="state.settings.cardFontSize"
       :card-icon-scale="state.settings.cardIconScale"
@@ -356,6 +464,8 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
       @update-theme="updateTheme"
       @update-sidebar-width="updateSidebarWidth"
       @update-font-family="updateFontFamily"
+      @update-font-color="updateFontColor"
+      @reset-font-color="resetFontColor"
       @update-font-size="updateFontSize"
       @update-card-font-size="updateCardFontSize"
       @update-card-icon-scale="updateCardIconScale"

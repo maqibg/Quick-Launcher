@@ -1,10 +1,21 @@
 .settingsPanel {
   position: fixed;
+  inset: 0;
   z-index: 70;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
-.settingsPanel > .modal__panel {
+.settingsPanel__backdrop {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+
+.settingsPanel__panel {
+  position: fixed;
   width: min(420px, calc(100vw - 32px));
   pointer-events: auto;
   box-sizing: border-box;
@@ -71,6 +82,12 @@
 .settingsRow__input {
   flex: 1;
   min-width: 0;
+}
+
+.settingsColorRow__picker {
+  width: 64px;
+  padding: 4px;
+  cursor: pointer;
 }
 
 .backgroundPreview {

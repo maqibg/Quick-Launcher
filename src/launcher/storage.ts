@@ -126,6 +126,9 @@ function coerceLauncherState(value: unknown): LauncherState | null {
   if (typeof rawSettings.fontFamily === "string" && rawSettings.fontFamily.trim()) {
     settings.fontFamily = rawSettings.fontFamily.trim();
   }
+  if (typeof rawSettings.fontColor === "string") {
+    settings.fontColor = rawSettings.fontColor.trim();
+  }
   if (typeof rawSettings.fontSize === "number") {
     settings.fontSize = clampFontSize(rawSettings.fontSize);
   }

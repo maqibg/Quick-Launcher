@@ -37,6 +37,8 @@ pub struct UiSettings {
     pub sidebar_width: u32,
     #[serde(rename = "fontFamily", default = "default_font_family")]
     pub font_family: String,
+    #[serde(rename = "fontColor", default)]
+    pub font_color: String,
     #[serde(rename = "fontSize", default = "default_font_size")]
     pub font_size: u32,
     #[serde(rename = "cardFontSize", default = "default_card_font_size")]
@@ -143,6 +145,7 @@ impl Default for UiSettings {
             theme: default_theme(),
             sidebar_width: default_sidebar_width(),
             font_family: default_font_family(),
+            font_color: String::new(),
             font_size: default_font_size(),
             card_font_size: default_card_font_size(),
             card_icon_scale: default_card_icon_scale(),

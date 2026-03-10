@@ -12,6 +12,8 @@ type Props = {
   theme: string;
   sidebarWidth: number;
   fontFamily: string;
+  fontColor: string;
+  resolvedFontColor: string;
   fontSize: number;
   cardFontSize: number;
   cardIconScale: number;
@@ -40,6 +42,8 @@ const emit = defineEmits<{
   (e: "updateTheme", value: string): void;
   (e: "updateSidebarWidth", value: number): void;
   (e: "updateFontFamily", value: string): void;
+  (e: "updateFontColor", value: string): void;
+  (e: "resetFontColor"): void;
   (e: "updateFontSize", value: number): void;
   (e: "updateCardFontSize", value: number): void;
   (e: "updateCardIconScale", value: number): void;
@@ -64,6 +68,8 @@ const toggleHotkey = ref("");
 const theme = ref("dark");
 const sidebarWidth = ref(150);
 const fontFamily = ref("system");
+const fontColor = ref("#e9edf3");
+const customFontColor = ref(false);
 const fontSize = ref(14);
 const cardFontSize = ref(12);
 const cardIconScale = ref(48);
@@ -180,6 +186,8 @@ watch(
     theme.value = props.theme;
     sidebarWidth.value = props.sidebarWidth;
     fontFamily.value = props.fontFamily;
+    customFontColor.value = !!props.fontColor.trim();
+    fontColor.value = props.fontColor.trim() || props.resolvedFontColor;
     fontSize.value = props.fontSize;
     cardFontSize.value = props.cardFontSize;
     cardIconScale.value = props.cardIconScale;
@@ -196,6 +204,14 @@ watch(
     customBackgroundScaleY.value = props.customBackgroundScaleY;
   },
   { immediate: true },
+);
+
+watch(
+  () => props.resolvedFontColor,
+  (value) => {
+    if (!props.open || customFontColor.value) return;
+    fontColor.value = value;
+  },
 );
 
 function onLanguageChange(ev: Event): void {
@@ -238,6 +254,19 @@ function onFontFamilyChange(ev: Event): void {
   const next = (ev.target as HTMLSelectElement).value;
   fontFamily.value = next;
   emit("updateFontFamily", next);
+}
+
+function onFontColorInput(ev: Event): void {
+  const next = (ev.target as HTMLInputElement).value;
+  fontColor.value = next;
+  customFontColor.value = true;
+  emit("updateFontColor", next);
+}
+
+function onResetFontColor(): void {
+  customFontColor.value = false;
+  fontColor.value = props.resolvedFontColor;
+  emit("resetFontColor");
 }
 
 function onFontSizeInput(ev: Event): void {
@@ -359,12 +388,13 @@ function onApplyHotkey(): void {
 </script>
 
 <template>
-  <div
-    v-if="open"
-    class="settingsPanel"
-    :style="{ left: `${panelX}px`, top: `${panelY}px` }"
-  >
-    <div ref="panelEl" class="modal__panel" :style="{ maxHeight: `${panelMaxHeight}px` }">
+  <div v-if="open" class="settingsPanel">
+    <div class="settingsPanel__backdrop" @click="emit('close')" />
+    <div
+      ref="panelEl"
+      class="modal__panel settingsPanel__panel"
+      :style="{ left: `${panelX}px`, top: `${panelY}px`, maxHeight: `${panelMaxHeight}px` }"
+    >
       <div class="modal__title modal__title--draggable" @mousedown="startDrag">
         {{ t("settings.title") }}
       </div>
@@ -428,6 +458,17 @@ function onApplyHotkey(): void {
               {{ opt.label }}
             </option>
           </select>
+        </label>
+
+        <label class="field">
+          <div class="field__label">{{ t("settings.fontColor") }}</div>
+          <div class="settingsRow">
+            <input class="field__input settingsColorRow__picker" type="color" :value="fontColor" @input="onFontColorInput" />
+            <button class="btn" type="button" @click="onResetFontColor">
+              {{ t("settings.fontColorReset") }}
+            </button>
+          </div>
+          <div class="field__hint">{{ fontColor }}</div>
         </label>
 
         <label class="field">

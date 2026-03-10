@@ -31,6 +31,7 @@ import {
   clampBackgroundScale,
   clampSidebarWidth,
   computeAppStyle,
+  normalizeFontColor,
   normalizeTheme,
 } from "./uiSettings";
 
@@ -1172,6 +1173,16 @@ export function useLauncherModel() {
     scheduleSave();
   }
 
+  function updateFontColor(value: string): void {
+    state.settings.fontColor = normalizeFontColor(value);
+    scheduleSave();
+  }
+
+  function resetFontColor(): void {
+    state.settings.fontColor = "";
+    scheduleSave();
+  }
+
   function updateFontSize(value: number): void {
     state.settings.fontSize = clampFontSize(value);
     scheduleSave();
@@ -1355,7 +1366,7 @@ export function useLauncherModel() {
     addGroup, removeGroup,
     minimizeWindow, toggleMaximizeWindow, closeWindow, startWindowDragging,
     closeEditor, applyEditorUpdate, openSettings, closeSettings,
-    updateCardWidth, updateCardHeight, updateSidebarWidth, updateFontFamily, updateFontSize,
+    updateCardWidth, updateCardHeight, updateSidebarWidth, updateFontFamily, updateFontColor, resetFontColor, updateFontSize,
     updateCardFontSize, updateCardIconScale, updateTheme, updateDblClickBlankToHide,
     updateLanguage, updateAlwaysOnTop, updateHideOnStartup, updateUseRelativePath, updateEnableGroupDragSort, updateAutoStart,
     updateCustomBackgroundEnabled, updateCustomBackgroundBlur, updateCustomBackgroundScaleX, updateCustomBackgroundScaleY,

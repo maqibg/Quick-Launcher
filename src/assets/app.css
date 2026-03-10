@@ -24,6 +24,7 @@ input {
   position: relative;
   overflow: hidden;
   isolation: isolate;
+  color-scheme: dark;
   --card-min-width: 120px;
   --card-height: 96px;
   --card-icon-size: 42px;
@@ -44,6 +45,11 @@ input {
   --surface-empty: rgba(255, 255, 255, 0.03);
   --surface-hover: rgba(255, 255, 255, 0.09);
   --surface-hover-soft: rgba(255, 255, 255, 0.08);
+  --group-surface: transparent;
+  --group-surface-hover: var(--surface-input);
+  --group-active-surface: rgba(86, 135, 255, 0.16);
+  --group-active-border: rgba(86, 135, 255, 0.3);
+  --text-shadow-contrast: none;
   --shadow-1: rgba(0, 0, 0, 0.5);
   --shadow-2: rgba(0, 0, 0, 0.35);
   color: var(--text);
@@ -68,7 +74,21 @@ input {
   z-index: 0;
 }
 
-.app__background--half {
+.app__background--topbar {
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--topbar-height);
+}
+
+.app__background--sidebar {
+  top: var(--topbar-height);
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar-width);
+}
+
+.app__background--main {
   top: var(--topbar-height);
   right: 0;
   bottom: 0;
@@ -83,15 +103,13 @@ input {
   background-size: contain;
 }
 
-.app__backgroundShade {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(4, 8, 16, 0.1), rgba(4, 8, 16, 0.3)),
-    linear-gradient(90deg, rgba(4, 8, 16, 0.08), rgba(4, 8, 16, 0.16));
+.app__backgroundImage--projected {
+  inset: auto;
+  background-size: 100% 100%;
 }
 
 .app[data-theme="light"] {
+  color-scheme: light;
   --text: #0b1220;
   --divider: rgba(0, 0, 0, 0.12);
   --border: rgba(0, 0, 0, 0.14);
@@ -127,17 +145,62 @@ input {
 
 .app--custom-background .topbar,
 .app--custom-background .sidebar {
-  background: rgba(8, 10, 14, 0.26);
+  background: transparent;
 }
 
-.app[data-theme="light"].app--custom-background .topbar,
-.app[data-theme="light"].app--custom-background .sidebar {
-  background: rgba(255, 255, 255, 0.32);
+.app--custom-background {
+  --surface-input: rgba(8, 10, 14, 0.24);
+  --surface-card: rgba(8, 10, 14, 0.34);
+  --surface-hover: rgba(8, 10, 14, 0.42);
+  --surface-hover-soft: rgba(8, 10, 14, 0.46);
+  --group-surface: rgba(8, 10, 14, 0.24);
+  --group-surface-hover: rgba(8, 10, 14, 0.36);
+  --group-active-surface: rgba(8, 10, 14, 0.62);
+  --group-active-border: rgba(86, 135, 255, 0.55);
+  --text-shadow-contrast:
+    0 1px 2px rgba(0, 0, 0, 0.7),
+    0 0 10px rgba(0, 0, 0, 0.28);
 }
 
-.app--custom-background .topbar,
-.app--custom-background .sidebar {
-  background: var(--surface-strong);
+.app[data-theme="light"].app--custom-background {
+  --surface-input: rgba(255, 255, 255, 0.4);
+  --surface-card: rgba(255, 255, 255, 0.52);
+  --surface-hover: rgba(255, 255, 255, 0.58);
+  --surface-hover-soft: rgba(255, 255, 255, 0.68);
+  --group-surface: rgba(255, 255, 255, 0.26);
+  --group-surface-hover: rgba(255, 255, 255, 0.42);
+  --group-active-surface: rgba(86, 135, 255, 0.16);
+  --group-active-border: rgba(86, 135, 255, 0.3);
+  --text-shadow-contrast:
+    0 1px 2px rgba(255, 255, 255, 0.55),
+    0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+.app--custom-background .topbar {
+  backdrop-filter: none;
+}
+
+.app--custom-background .topbar__title,
+.app--custom-background .group__name,
+.app--custom-background .sidebar__settings,
+.app--custom-background .card__name {
+  text-shadow: var(--text-shadow-contrast);
+}
+
+.app--custom-background .topbar__title {
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(8, 10, 14, 0.28);
+}
+
+.app[data-theme="light"].app--custom-background .topbar__title {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.app--custom-background .group__name,
+.app--custom-background .sidebar__settings,
+.app--custom-background .card__name {
+  font-weight: 600;
 }
 
 .topbar__drag {
@@ -268,19 +331,19 @@ input {
   padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid transparent;
-  background: transparent;
+  background: var(--group-surface);
   color: inherit;
   cursor: pointer;
   text-align: left;
 }
 
 .group:hover {
-  background: var(--surface-input);
+  background: var(--group-surface-hover);
 }
 
 .group--active {
-  background: rgba(86, 135, 255, 0.16);
-  border-color: rgba(86, 135, 255, 0.3);
+  background: var(--group-active-surface);
+  border-color: var(--group-active-border);
 }
 
 .group__dot {
@@ -592,6 +655,22 @@ input {
   background: var(--surface-input);
   color: inherit;
   outline: none;
+}
+
+select.field__input {
+  appearance: auto;
+}
+
+.app[data-theme="dark"] select.field__input option,
+.app[data-theme="dark"] select.field__input optgroup {
+  background-color: rgba(10, 14, 22, 0.98);
+  color: #e9edf3;
+}
+
+.app[data-theme="light"] select.field__input option,
+.app[data-theme="light"] select.field__input optgroup {
+  background-color: rgba(255, 255, 255, 0.98);
+  color: #0b1220;
 }
 
 .field__input--range {

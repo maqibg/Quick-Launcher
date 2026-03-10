@@ -6,8 +6,25 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
 export function normalizeTheme(value: unknown): "dark" | "light" {
   return value === "light" ? "light" : "dark";
+}
+
+export function getDefaultFontColor(theme: "dark" | "light"): string {
+  return theme === "light" ? "#0b1220" : "#e9edf3";
+}
+
+export function normalizeFontColor(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (!HEX_COLOR_RE.test(trimmed)) return "";
+  if (trimmed.length === 4) {
+    const [hash, r, g, b] = trimmed;
+    return `${hash}${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return trimmed.toLowerCase();
 }
 
 export function clampCardWidth(value: number): number {
@@ -58,6 +75,11 @@ export function applyLoadedUiSettings(target: UiSettings, loaded: UiSettings): v
   const maybeFontFamily = (loaded as any).fontFamily;
   if (typeof maybeFontFamily === "string" && maybeFontFamily.trim()) {
     target.fontFamily = maybeFontFamily.trim();
+  }
+
+  const maybeFontColor = (loaded as any).fontColor;
+  if (typeof maybeFontColor === "string") {
+    target.fontColor = normalizeFontColor(maybeFontColor);
   }
 
   const maybeFontSize = (loaded as any).fontSize;
@@ -116,10 +138,12 @@ export function applyLoadedUiSettings(target: UiSettings, loaded: UiSettings): v
 export function computeAppStyle(settings: UiSettings): Record<string, string> {
   const width = clampCardWidth(settings.cardWidth);
   const height = clampCardHeight(settings.cardHeight);
+  const theme = normalizeTheme(settings.theme);
 
   const iconMax = Math.min(width, height) * 0.82;
   const icon = clampCardIconScale(settings.cardIconScale, iconMax);
   const iconImg = Math.max(12, Math.round(icon * 0.72));
+  const fontColor = normalizeFontColor(settings.fontColor) || getDefaultFontColor(theme);
 
   return {
     "--card-min-width": `${width}px`,
@@ -129,6 +153,7 @@ export function computeAppStyle(settings: UiSettings): Record<string, string> {
     "--card-font-size": `${clampCardFontSize(settings.cardFontSize)}px`,
     "--sidebar-width": `${clampSidebarWidth(settings.sidebarWidth)}px`,
     "--font-family": resolveFontFamilyCss(settings.fontFamily),
+    "--text": fontColor,
     "--font-size": `${clampFontSize(settings.fontSize)}px`,
   };
 }
