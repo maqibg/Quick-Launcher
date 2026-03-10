@@ -4,6 +4,7 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     path::PathBuf,
+    sync::OnceLock,
 };
 use tauri::Manager;
 
@@ -25,7 +26,11 @@ fn default_card_size() -> u32 {
 pub struct UiSettings {
     #[serde(rename = "language", default = "default_language")]
     pub language: String,
-    #[serde(rename = "cardWidth", alias = "cardSize", default = "default_card_size")]
+    #[serde(
+        rename = "cardWidth",
+        alias = "cardSize",
+        default = "default_card_size"
+    )]
     pub card_width: u32,
     #[serde(rename = "cardHeight", default = "default_card_height")]
     pub card_height: u32,
@@ -67,11 +72,20 @@ pub struct UiSettings {
     pub custom_background_enabled: bool,
     #[serde(rename = "customBackgroundPath", default)]
     pub custom_background_path: String,
-    #[serde(rename = "customBackgroundBlur", default = "default_custom_background_blur")]
+    #[serde(
+        rename = "customBackgroundBlur",
+        default = "default_custom_background_blur"
+    )]
     pub custom_background_blur: u32,
-    #[serde(rename = "customBackgroundScaleX", default = "default_custom_background_scale")]
+    #[serde(
+        rename = "customBackgroundScaleX",
+        default = "default_custom_background_scale"
+    )]
     pub custom_background_scale_x: u32,
-    #[serde(rename = "customBackgroundScaleY", default = "default_custom_background_scale")]
+    #[serde(
+        rename = "customBackgroundScaleY",
+        default = "default_custom_background_scale"
+    )]
     pub custom_background_scale_y: u32,
 }
 
@@ -250,13 +264,9 @@ fn migrate_legacy_db_if_needed(app: &tauri::AppHandle, new_path: &PathBuf) -> Re
     Ok(())
 }
 
-fn open_db(app: &tauri::AppHandle) -> Result<Connection, String> {
-    let path = db_path(app)?;
-    migrate_legacy_db_if_needed(app, &path)?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    let conn = Connection::open(path).map_err(|e| e.to_string())?;
+static DB_READY: OnceLock<Result<(), String>> = OnceLock::new();
+
+fn configure_connection(conn: &Connection) -> Result<(), String> {
     conn.pragma_update(None, "journal_mode", "WAL")
         .map_err(|e| e.to_string())?;
     conn.pragma_update(None, "synchronous", "NORMAL")
@@ -269,6 +279,10 @@ fn open_db(app: &tauri::AppHandle) -> Result<Connection, String> {
         .map_err(|e| e.to_string())?;
     conn.pragma_update(None, "temp_store", "2")
         .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn ensure_schema(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         r#"
 CREATE TABLE IF NOT EXISTS meta (
@@ -303,15 +317,18 @@ CREATE TABLE IF NOT EXISTS app_icons (
 );
 "#,
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| e.to_string())
+}
 
+fn ensure_app_columns(conn: &Connection) {
     // Migration: apps.icon -> app_icons
-    conn.execute(
-        "INSERT OR IGNORE INTO app_icons (app_id, icon, updated_at)
+    let _ = conn
+        .execute(
+            "INSERT OR IGNORE INTO app_icons (app_id, icon, updated_at)
          SELECT id, icon, added_at FROM apps WHERE icon != ''",
-        [],
-    )
-    .map_err(|e| e.to_string())?;
+            [],
+        )
+        .map_err(|e| e.to_string());
 
     let has_icon: i64 = conn
         .query_row(
@@ -321,7 +338,10 @@ CREATE TABLE IF NOT EXISTS app_icons (
         )
         .unwrap_or(0);
     if has_icon == 0 {
-        let _ = conn.execute("ALTER TABLE apps ADD COLUMN icon TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE apps ADD COLUMN icon TEXT NOT NULL DEFAULT ''",
+            [],
+        );
     }
     let has_run_as_admin: i64 = conn
         .query_row(
@@ -344,7 +364,10 @@ CREATE TABLE IF NOT EXISTS app_icons (
         )
         .unwrap_or(0);
     if has_keywords == 0 {
-        let _ = conn.execute("ALTER TABLE apps ADD COLUMN keywords TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE apps ADD COLUMN keywords TEXT NOT NULL DEFAULT ''",
+            [],
+        );
     }
     let has_note: i64 = conn
         .query_row(
@@ -354,7 +377,10 @@ CREATE TABLE IF NOT EXISTS app_icons (
         )
         .unwrap_or(0);
     if has_note == 0 {
-        let _ = conn.execute("ALTER TABLE apps ADD COLUMN note TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE apps ADD COLUMN note TEXT NOT NULL DEFAULT ''",
+            [],
+        );
     }
     let has_content: i64 = conn
         .query_row(
@@ -364,8 +390,37 @@ CREATE TABLE IF NOT EXISTS app_icons (
         )
         .unwrap_or(0);
     if has_content == 0 {
-        let _ = conn.execute("ALTER TABLE apps ADD COLUMN content TEXT NOT NULL DEFAULT ''", []);
+        let _ = conn.execute(
+            "ALTER TABLE apps ADD COLUMN content TEXT NOT NULL DEFAULT ''",
+            [],
+        );
     }
+}
+
+fn initialize_db(app: &tauri::AppHandle, path: &PathBuf) -> Result<(), String> {
+    migrate_legacy_db_if_needed(app, path)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let conn = Connection::open(path).map_err(|e| e.to_string())?;
+    configure_connection(&conn)?;
+    ensure_schema(&conn)?;
+    ensure_app_columns(&conn);
+    Ok(())
+}
+
+fn ensure_db_ready(app: &tauri::AppHandle, path: &PathBuf) -> Result<(), String> {
+    match DB_READY.get_or_init(|| initialize_db(app, path)) {
+        Ok(()) => Ok(()),
+        Err(err) => Err(err.clone()),
+    }
+}
+
+fn open_db(app: &tauri::AppHandle) -> Result<Connection, String> {
+    let path = db_path(app)?;
+    ensure_db_ready(app, &path)?;
+    let conn = Connection::open(path).map_err(|e| e.to_string())?;
+    configure_connection(&conn)?;
     Ok(conn)
 }
 
@@ -392,7 +447,9 @@ pub fn load_launcher_state(app: tauri::AppHandle) -> Result<Option<LauncherState
         .prepare("SELECT id, name FROM groups ORDER BY position ASC")
         .map_err(|e| e.to_string())?;
     let group_rows = groups_stmt
-        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
         .map_err(|e| e.to_string())?;
 
     let mut groups: Vec<Group> = Vec::new();
@@ -407,10 +464,9 @@ pub fn load_launcher_state(app: tauri::AppHandle) -> Result<Option<LauncherState
 
     let mut apps_stmt = conn
         .prepare(
-            "SELECT a.id, a.group_id, a.name, a.path, a.args, a.run_as_admin, a.keywords, a.note, a.content, COALESCE(i.icon, a.icon) as icon, a.added_at
+            "SELECT a.id, a.group_id, a.name, a.path, a.args, a.run_as_admin, a.keywords, a.note, a.content, a.added_at
              FROM apps a
-             LEFT JOIN app_icons i ON a.id = i.app_id
-             ORDER BY a.position ASC",
+             ORDER BY a.group_id ASC, a.position ASC",
         )
         .map_err(|e| e.to_string())?;
     let app_rows = apps_stmt
@@ -425,21 +481,35 @@ pub fn load_launcher_state(app: tauri::AppHandle) -> Result<Option<LauncherState
                 row.get::<_, String>(6)?,
                 row.get::<_, String>(7)?,
                 row.get::<_, String>(8)?,
-                row.get::<_, String>(9)?,
-                row.get::<_, i64>(10)?,
+                row.get::<_, i64>(9)?,
             ))
         })
         .map_err(|e| e.to_string())?;
 
     let mut apps_by_group: HashMap<String, Vec<AppEntry>> = HashMap::new();
     for row in app_rows {
-        let (id, group_id, name, path, args, run_as_admin, keywords, note, content, icon, added_at) =
+        let (id, group_id, name, path, args, run_as_admin, keywords, note, content, added_at) =
             row.map_err(|e| e.to_string())?;
-        let args_opt = if args.trim().is_empty() { None } else { Some(args) };
-        let keywords_opt = if keywords.trim().is_empty() { None } else { Some(keywords) };
-        let note_opt = if note.trim().is_empty() { None } else { Some(note) };
-        let content_opt = if content.trim().is_empty() { None } else { Some(content) };
-        let icon_opt = if icon.trim().is_empty() { None } else { Some(icon) };
+        let args_opt = if args.trim().is_empty() {
+            None
+        } else {
+            Some(args)
+        };
+        let keywords_opt = if keywords.trim().is_empty() {
+            None
+        } else {
+            Some(keywords)
+        };
+        let note_opt = if note.trim().is_empty() {
+            None
+        } else {
+            Some(note)
+        };
+        let content_opt = if content.trim().is_empty() {
+            None
+        } else {
+            Some(content)
+        };
         apps_by_group.entry(group_id).or_default().push(AppEntry {
             id,
             name,
@@ -449,7 +519,7 @@ pub fn load_launcher_state(app: tauri::AppHandle) -> Result<Option<LauncherState
             keywords: keywords_opt,
             note: note_opt,
             content: content_opt,
-            icon: icon_opt,
+            icon: None,
             added_at,
         });
     }
@@ -552,25 +622,55 @@ pub fn save_launcher_state(app: tauri::AppHandle, state: LauncherState) -> Resul
 
     // Delete removed apps (diff delete)
     if !new_app_ids.is_empty() {
-        let placeholders: String = new_app_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let placeholders: String = new_app_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
         let sql = format!("DELETE FROM apps WHERE id NOT IN ({})", placeholders);
-        let params: Vec<&dyn rusqlite::ToSql> = new_app_ids.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
-        tx.execute(&sql, params.as_slice()).map_err(|e| e.to_string())?;
+        let params: Vec<&dyn rusqlite::ToSql> = new_app_ids
+            .iter()
+            .map(|s| s as &dyn rusqlite::ToSql)
+            .collect();
+        tx.execute(&sql, params.as_slice())
+            .map_err(|e| e.to_string())?;
     } else {
-        tx.execute("DELETE FROM apps", []).map_err(|e| e.to_string())?;
+        tx.execute("DELETE FROM apps", [])
+            .map_err(|e| e.to_string())?;
     }
 
     // Delete removed groups (diff delete)
     if !new_group_ids.is_empty() {
-        let placeholders: String = new_group_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let placeholders: String = new_group_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
         let sql = format!("DELETE FROM groups WHERE id NOT IN ({})", placeholders);
-        let params: Vec<&dyn rusqlite::ToSql> = new_group_ids.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
-        tx.execute(&sql, params.as_slice()).map_err(|e| e.to_string())?;
+        let params: Vec<&dyn rusqlite::ToSql> = new_group_ids
+            .iter()
+            .map(|s| s as &dyn rusqlite::ToSql)
+            .collect();
+        tx.execute(&sql, params.as_slice())
+            .map_err(|e| e.to_string())?;
     } else {
-        tx.execute("DELETE FROM groups", []).map_err(|e| e.to_string())?;
+        tx.execute("DELETE FROM groups", [])
+            .map_err(|e| e.to_string())?;
     }
 
     tx.commit().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_active_group_id(app: tauri::AppHandle, active_group_id: String) -> Result<(), String> {
+    let conn = open_db(&app)?;
+    conn.execute(
+        "INSERT INTO meta(key, value) VALUES('active_group_id', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![active_group_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 fn load_ui_settings(conn: &Connection) -> UiSettings {

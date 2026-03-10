@@ -95,4 +95,3 @@ pub fn validate_paths(paths: Vec<String>) -> Vec<bool> {
         })
         .collect()
 }
-

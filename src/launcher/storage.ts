@@ -18,6 +18,43 @@ function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+function normalizeOptionalText(value: string | undefined): string | undefined {
+  const text = value?.trim();
+  return text ? text : undefined;
+}
+
+function createPersistedAppEntry(app: AppEntry): AppEntry {
+  const args = normalizeOptionalText(app.args);
+  const keywords = normalizeOptionalText(app.keywords);
+  const note = normalizeOptionalText(app.note);
+  const content = normalizeOptionalText(app.content);
+
+  return {
+    id: app.id,
+    name: app.name,
+    path: app.path,
+    runAsAdmin: app.runAsAdmin,
+    addedAt: app.addedAt,
+    ...(args ? { args } : {}),
+    ...(keywords ? { keywords } : {}),
+    ...(note ? { note } : {}),
+    ...(content ? { content } : {}),
+  };
+}
+
+function createPersistedStateSnapshot(state: LauncherState): LauncherState {
+  return {
+    version: 1,
+    activeGroupId: state.activeGroupId,
+    groups: state.groups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      apps: group.apps.map(createPersistedAppEntry),
+    })),
+    settings: { ...state.settings },
+  };
+}
+
 function coerceLauncherState(value: unknown): LauncherState | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as {
@@ -72,7 +109,6 @@ function coerceLauncherState(value: unknown): LauncherState | null {
           const keywords = typeof appRaw.keywords === "string" ? appRaw.keywords : "";
           const note = typeof appRaw.note === "string" ? appRaw.note : "";
           const content = typeof appRaw.content === "string" ? appRaw.content : undefined;
-          const icon = typeof appRaw.icon === "string" ? appRaw.icon : undefined;
           const addedAt =
             typeof appRaw.addedAt === "number" && Number.isFinite(appRaw.addedAt)
               ? appRaw.addedAt
@@ -86,7 +122,6 @@ function coerceLauncherState(value: unknown): LauncherState | null {
             keywords,
             note,
             content,
-            icon,
             addedAt,
           };
         })
@@ -207,7 +242,7 @@ export async function loadState(): Promise<LauncherState> {
   const legacy = loadLegacyState();
   if (legacy) {
     try {
-      await invoke("save_launcher_state", { state: legacy });
+      await saveState(legacy);
       localStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch {
       // keep legacy as fallback
@@ -218,7 +253,7 @@ export async function loadState(): Promise<LauncherState> {
   const initial = createDefaultState();
   if (!fromDb) {
     try {
-      await invoke("save_launcher_state", { state: initial });
+      await saveState(initial);
     } catch {
       // ignore
     }
@@ -228,5 +263,10 @@ export async function loadState(): Promise<LauncherState> {
 
 export async function saveState(state: LauncherState): Promise<void> {
   if (!isTauriRuntime()) return;
-  await invoke("save_launcher_state", { state });
+  await invoke("save_launcher_state", { state: createPersistedStateSnapshot(state) });
+}
+
+export async function saveActiveGroupId(activeGroupId: string): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke("save_active_group_id", { activeGroupId });
 }

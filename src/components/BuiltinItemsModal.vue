@@ -42,21 +42,32 @@ const filtered = computed(() => {
 async function loadIcons(): Promise<void> {
   if (!isTauriRuntime) return;
   const missing = props.items.filter((item) => !item.preferBuiltinIcon && !icons.value[item.id]);
-  await Promise.all(
+  const loaded = await Promise.all(
     missing.map(async (item) => {
       try {
         const icon = (await invoke("get_file_icon", {
           path: `builtin:${item.id}`,
           size: 48,
         })) as string | null;
-        if (icon) {
-          icons.value = { ...icons.value, [item.id]: icon };
-        }
+        return icon ? [item.id, icon] as const : null;
       } catch {
         // keep fallback badge
+        return null;
       }
     }),
   );
+  const nextIcons = { ...icons.value };
+  let changed = false;
+  for (const item of loaded) {
+    if (!item) continue;
+    const [id, icon] = item;
+    if (nextIcons[id] === icon) continue;
+    nextIcons[id] = icon;
+    changed = true;
+  }
+  if (changed) {
+    icons.value = nextIcons;
+  }
 }
 </script>
 

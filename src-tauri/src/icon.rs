@@ -11,14 +11,60 @@ struct IconKey {
 struct CacheEntry {
     data: Option<String>,
     created_at: Instant,
+    last_accessed_at: Instant,
 }
 
 const NEGATIVE_CACHE_TTL_SECS: u64 = 300;
+const POSITIVE_CACHE_TTL_SECS: u64 = 900;
+const MAX_MEMORY_ICON_CACHE_ENTRIES: usize = 256;
 
 static ICON_CACHE: OnceLock<Mutex<HashMap<IconKey, CacheEntry>>> = OnceLock::new();
 
 fn get_icon_cache() -> &'static Mutex<HashMap<IconKey, CacheEntry>> {
     ICON_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn prune_icon_cache(cache: &mut HashMap<IconKey, CacheEntry>) {
+    cache.retain(|_, entry| {
+        let ttl = if entry.data.is_some() {
+            POSITIVE_CACHE_TTL_SECS
+        } else {
+            NEGATIVE_CACHE_TTL_SECS
+        };
+        entry.created_at.elapsed().as_secs() < ttl
+    });
+
+    if cache.len() <= MAX_MEMORY_ICON_CACHE_ENTRIES {
+        return;
+    }
+
+    let overflow = cache.len() - MAX_MEMORY_ICON_CACHE_ENTRIES;
+    let mut eviction_order: Vec<(IconKey, Instant)> = cache
+        .iter()
+        .map(|(key, entry)| (key.clone(), entry.last_accessed_at))
+        .collect();
+    eviction_order.sort_by_key(|(_, last_accessed_at)| *last_accessed_at);
+
+    for (key, _) in eviction_order.into_iter().take(overflow) {
+        cache.remove(&key);
+    }
+}
+
+fn insert_cache_entry(
+    cache: &mut HashMap<IconKey, CacheEntry>,
+    key: IconKey,
+    data: Option<String>,
+) {
+    let now = Instant::now();
+    cache.insert(
+        key,
+        CacheEntry {
+            data,
+            created_at: now,
+            last_accessed_at: now,
+        },
+    );
+    prune_icon_cache(cache);
 }
 
 fn hash_key(key: &IconKey) -> String {
@@ -99,33 +145,38 @@ pub async fn get_file_icon(
 
     // 1. Check memory cache (fast)
     {
-        let cache = get_icon_cache().lock().map_err(|e| e.to_string())?;
-        if let Some(entry) = cache.get(&key) {
-            if entry.data.is_some() {
-                return Ok(entry.data.clone());
-            }
-            if entry.created_at.elapsed().as_secs() < NEGATIVE_CACHE_TTL_SECS {
+        let mut cache = get_icon_cache().lock().map_err(|e| e.to_string())?;
+        let mut expired = false;
+        if let Some(entry) = cache.get_mut(&key) {
+            if let Some(data) = entry.data.clone() {
+                if entry.created_at.elapsed().as_secs() < POSITIVE_CACHE_TTL_SECS {
+                    entry.last_accessed_at = Instant::now();
+                    return Ok(Some(data));
+                }
+                expired = true;
+            } else if entry.created_at.elapsed().as_secs() < NEGATIVE_CACHE_TTL_SECS {
+                entry.last_accessed_at = Instant::now();
                 return Ok(None);
+            } else {
+                expired = true;
             }
+        }
+        if expired {
+            cache.remove(&key);
         }
     }
 
     // 2. Check disk cache
     let app_clone = app.clone();
     let key_clone = key.clone();
-    if let Some(data) = tauri::async_runtime::spawn_blocking(move || disk_get(&app_clone, &key_clone))
-        .await
-        .map_err(|e| e.to_string())?
+    if let Some(data) =
+        tauri::async_runtime::spawn_blocking(move || disk_get(&app_clone, &key_clone))
+            .await
+            .map_err(|e| e.to_string())?
     {
         // Fill memory cache
         if let Ok(mut cache) = get_icon_cache().lock() {
-            cache.insert(
-                key,
-                CacheEntry {
-                    data: Some(data.clone()),
-                    created_at: Instant::now(),
-                },
-            );
+            insert_cache_entry(&mut cache, key, Some(data.clone()));
         }
         return Ok(Some(data));
     }
@@ -134,10 +185,11 @@ pub async fn get_file_icon(
     #[cfg(target_os = "windows")]
     {
         let path_for_spawn = lookup_path.clone();
-        let result =
-            tauri::async_runtime::spawn_blocking(move || get_file_icon_windows(&path_for_spawn, icon_size))
-                .await
-                .map_err(|e| e.to_string())?;
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            get_file_icon_windows(&path_for_spawn, icon_size)
+        })
+        .await
+        .map_err(|e| e.to_string())?;
 
         // Update caches
         if let Ok(data) = &result {
@@ -149,12 +201,8 @@ pub async fn get_file_icon(
             });
         }
 
-        let cache_entry = CacheEntry {
-            data: result.as_ref().ok().cloned(),
-            created_at: Instant::now(),
-        };
         if let Ok(mut cache) = get_icon_cache().lock() {
-            cache.insert(key, cache_entry);
+            insert_cache_entry(&mut cache, key, result.as_ref().ok().cloned());
         }
         return result.map(Some).or(Ok(None));
     }
@@ -307,8 +355,7 @@ fn hbitmap_to_png_data_url(
     use image::codecs::png::PngEncoder;
     use image::ImageEncoder;
     use windows::Win32::Graphics::Gdi::{
-        GetDC, GetDIBits, GetObjectW, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
-        DIB_RGB_COLORS,
+        GetDC, GetDIBits, GetObjectW, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
     };
 
     if color.0.is_null() {
@@ -349,10 +396,7 @@ fn hbitmap_to_png_data_url(
 
     let mut bgra = vec![0u8; (width * height * 4) as usize];
     let hdc = unsafe { GetDC(None) };
-    let _hdc_guard = HdcGuard {
-        hdc,
-        hwnd: None,
-    };
+    let _hdc_guard = HdcGuard { hdc, hwnd: None };
 
     let scan_lines = unsafe {
         GetDIBits(
@@ -497,8 +541,16 @@ fn get_resource_icon_windows(resource_path: &str, size: u32) -> Result<String, S
         ExtractIconExW(
             PCWSTR(wide.as_ptr()),
             index,
-            if size > 16 { Some(large.as_mut_ptr()) } else { None },
-            if size <= 16 { Some(small.as_mut_ptr()) } else { None },
+            if size > 16 {
+                Some(large.as_mut_ptr())
+            } else {
+                None
+            },
+            if size <= 16 {
+                Some(small.as_mut_ptr())
+            } else {
+                None
+            },
             1,
         )
     };

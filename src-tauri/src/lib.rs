@@ -502,6 +502,7 @@ pub fn run() {
             read_image_as_data_url,
             open_app_folder,
             storage::load_launcher_state,
+            storage::save_active_group_id,
             storage::save_launcher_state,
             paths::validate_paths
         ])

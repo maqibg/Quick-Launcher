@@ -1,9 +1,9 @@
 import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createWindowControls } from "./windowControls";
 
-import { loadState, saveState } from "./storage";
+import { loadState, saveActiveGroupId, saveState } from "./storage";
 import type { AppEntry, Group, LauncherState } from "./types";
 import { createAppEditorModel } from "./appEditorModel";
 import { createAddAppFlow, isUwpPath, UWP_PREFIX } from "./addAppFlow";
@@ -53,6 +53,7 @@ export function useLauncherModel() {
   const settingsOpen = ref(false);
 
   let saveTimer: number | null = null;
+  let activeGroupSaveTimer: number | null = null;
   let saveErrorShown = false;
   let suppressGroupClickUntil = 0;
 
@@ -82,11 +83,14 @@ export function useLauncherModel() {
 
   // Inverted search index for faster search
   const searchIndex = shallowRef(new Map<string, Set<string>>());
+  const appLookup = shallowRef(new Map<string, { group: Group; app: AppEntry }>());
 
   function rebuildSearchIndex(): void {
     const index = new Map<string, Set<string>>();
+    const lookup = new Map<string, { group: Group; app: AppEntry }>();
     for (const group of state.groups) {
       for (const app of group.apps) {
+        lookup.set(app.id, { group, app });
         const searchable = `${app.name} ${app.keywords ?? ""}`.toLowerCase();
         const terms = [searchable, ...searchable.split(/[\s\-_\.]+/)];
         for (const term of terms) {
@@ -97,6 +101,7 @@ export function useLauncherModel() {
       }
     }
     searchIndex.value = index;
+    appLookup.value = lookup;
   }
 
   async function validateAll(): Promise<void> {
@@ -130,17 +135,6 @@ export function useLauncherModel() {
     }
   }
 
-  // Build app lookup map for O(1) access
-  const appById = computed(() => {
-    const map = new Map<string, AppEntry>();
-    for (const group of state.groups) {
-      for (const app of group.apps) {
-        map.set(app.id, app);
-      }
-    }
-    return map;
-  });
-
   const filteredApps = computed<AppEntry[]>(() => {
     const q = search.value.trim().toLowerCase();
     if (!q) {
@@ -156,8 +150,8 @@ export function useLauncherModel() {
     }
     const matches: AppEntry[] = [];
     for (const id of matchedIds) {
-      const app = appById.value.get(id);
-      if (app) matches.push(app);
+      const match = appLookup.value.get(id);
+      if (match) matches.push(match.app);
     }
     return matches;
   });
@@ -177,17 +171,12 @@ export function useLauncherModel() {
 
   async function refreshBackgroundImage(showError = false): Promise<void> {
     const path = state.settings.customBackgroundPath.trim();
-    if (!path) {
-      backgroundImageUrl.value = "";
-      return;
-    }
-    if (!tauriRuntime) {
+    if (!state.settings.customBackgroundEnabled || !path || !tauriRuntime) {
       backgroundImageUrl.value = "";
       return;
     }
     try {
-      const result = (await invoke("read_image_as_data_url", { path })) as unknown;
-      backgroundImageUrl.value = typeof result === "string" ? result : "";
+      backgroundImageUrl.value = convertFileSrc(path);
     } catch (e) {
       backgroundImageUrl.value = "";
       if (showError) {
@@ -230,8 +219,7 @@ export function useLauncherModel() {
     if (saveTimer) window.clearTimeout(saveTimer);
     saveTimer = window.setTimeout(() => {
       saveTimer = null;
-      const plain = JSON.parse(JSON.stringify(state)) as LauncherState;
-      saveState(plain).catch((e) => {
+      saveState(state).catch((e) => {
         if (saveErrorShown) return;
         saveErrorShown = true;
         showToast(t("error.saveFailed", { error: e instanceof Error ? e.message : String(e) }));
@@ -239,7 +227,27 @@ export function useLauncherModel() {
     }, 500);
   }
 
-  watch(() => state.activeGroupId, scheduleSave);
+  function scheduleActiveGroupSave(): void {
+    if (!hydrated.value) return;
+    if (activeGroupSaveTimer) {
+      window.clearTimeout(activeGroupSaveTimer);
+      activeGroupSaveTimer = null;
+    }
+    if (saveTimer) {
+      scheduleSave();
+      return;
+    }
+    activeGroupSaveTimer = window.setTimeout(() => {
+      activeGroupSaveTimer = null;
+      saveActiveGroupId(state.activeGroupId).catch((e) => {
+        if (saveErrorShown) return;
+        saveErrorShown = true;
+        showToast(t("error.saveFailed", { error: e instanceof Error ? e.message : String(e) }));
+      });
+    }, 120);
+  }
+
+  watch(() => state.activeGroupId, scheduleActiveGroupSave);
   watch(
     () => state.settings.language,
     (lang) => setUiLanguage(normalizeUiLanguage(lang)),
@@ -546,11 +554,7 @@ export function useLauncherModel() {
 
   function findAppById(appId?: string): { group: Group; app: AppEntry } | undefined {
     if (!appId) return undefined;
-    for (const group of state.groups) {
-      const app = group.apps.find((x) => x.id === appId);
-      if (app) return { group, app };
-    }
-    return undefined;
+    return appLookup.value.get(appId);
   }
 
   const menuAppGroupId = computed(() => findAppById(menu.targetId)?.group.id);
@@ -1203,6 +1207,11 @@ export function useLauncherModel() {
 
   function updateCustomBackgroundEnabled(value: boolean): void {
     state.settings.customBackgroundEnabled = value;
+    if (value) {
+      void refreshBackgroundImage(false);
+    } else {
+      backgroundImageUrl.value = "";
+    }
     scheduleSave();
   }
 
@@ -1344,6 +1353,7 @@ export function useLauncherModel() {
     window.removeEventListener("blur", closeMenu);
     if (uninstallSearchShortcuts) uninstallSearchShortcuts();
     if (saveTimer) window.clearTimeout(saveTimer);
+    if (activeGroupSaveTimer) window.clearTimeout(activeGroupSaveTimer);
     internalDrag.stopDrag();
     stopGroupSortTracking();
     clearGroupSortState();
