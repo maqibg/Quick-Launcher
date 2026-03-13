@@ -103,6 +103,10 @@ input {
   height: var(--topbar-height);
 }
 
+.app__background--full {
+  inset: 0;
+}
+
 .app__background--sidebar {
   top: var(--topbar-height);
   bottom: 0;
@@ -122,7 +126,8 @@ input {
   inset: 0;
   background-position: center;
   background-repeat: no-repeat;
-  background-size: contain;
+  background-size: cover;
+  transform-origin: center;
 }
 
 .app__backgroundImage--projected {

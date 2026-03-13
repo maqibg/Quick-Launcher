@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed } from "vue";
 import TopBar from "./components/TopBar.vue";
 import Sidebar from "./components/Sidebar.vue";
 import AppGrid from "./components/AppGrid.vue";
@@ -134,110 +134,14 @@ const {
   validateAll,
 } = useLauncherModel();
 
-const DEFAULT_TOPBAR_HEIGHT = 44;
-const appRoot = ref<HTMLElement | null>(null);
-const appSize = ref({ width: 0, height: 0 });
-
-let appResizeObserver: ResizeObserver | null = null;
-
-const sidebarWidth = computed(() => {
-  const rawWidth = appStyle.value["--sidebar-width"];
-  const parsedWidth = Number.parseFloat(rawWidth ?? "");
-  if (Number.isFinite(parsedWidth)) {
-    return parsedWidth;
-  }
-  return state.settings.sidebarWidth;
-});
-
-const topbarHeight = computed(() => {
-  const root = appRoot.value;
-  if (!root) {
-    return DEFAULT_TOPBAR_HEIGHT;
-  }
-  const rawHeight = getComputedStyle(root).getPropertyValue("--topbar-height");
-  const parsedHeight = Number.parseFloat(rawHeight);
-  return Number.isFinite(parsedHeight) ? parsedHeight : DEFAULT_TOPBAR_HEIGHT;
-});
-
-const mainBackgroundStyle = computed<Record<string, string>>(() => ({
-  backgroundImage: `url('${backgroundImageUrl.value}')`,
-  filter: `blur(${customBackgroundBlur.value}px)`,
-  backgroundSize: `${customBackgroundScaleX.value}% ${customBackgroundScaleY.value}%`,
-}));
-
-const projectedBackgroundFrame = computed(() => {
-  const width = appSize.value.width;
-  const height = appSize.value.height;
-  const sidebar = Math.max(0, Math.min(sidebarWidth.value, width));
-  const topbar = Math.max(0, Math.min(topbarHeight.value, height));
-  const mainWidth = Math.max(0, width - sidebar);
-  const mainHeight = Math.max(0, height - topbar);
-  const imageWidth = (mainWidth * customBackgroundScaleX.value) / 100;
-  const imageHeight = (mainHeight * customBackgroundScaleY.value) / 100;
-
+const backgroundStyle = computed<Record<string, string>>(() => {
+  const sx = Math.max(0, customBackgroundScaleX.value) / 100;
+  const sy = Math.max(0, customBackgroundScaleY.value) / 100;
   return {
-    left: sidebar + (mainWidth - imageWidth) / 2,
-    top: topbar + (mainHeight - imageHeight) / 2,
-    width: imageWidth,
-    height: imageHeight,
-    topbar,
-  };
-});
-
-function toPixel(value: number): string {
-  return `${Math.round(value * 100) / 100}px`;
-}
-
-function buildProjectedBackgroundStyle(offsetTop: number): Record<string, string> {
-  const frame = projectedBackgroundFrame.value;
-  return {
-    left: toPixel(frame.left),
-    top: toPixel(frame.top - offsetTop),
-    width: toPixel(frame.width),
-    height: toPixel(frame.height),
     backgroundImage: `url('${backgroundImageUrl.value}')`,
     filter: `blur(${customBackgroundBlur.value}px)`,
+    transform: `scaleX(${sx}) scaleY(${sy})`,
   };
-}
-
-const topbarBackgroundStyle = computed<Record<string, string>>(() => {
-  return buildProjectedBackgroundStyle(0);
-});
-
-const sidebarBackgroundStyle = computed<Record<string, string>>(() => {
-  return buildProjectedBackgroundStyle(projectedBackgroundFrame.value.topbar);
-});
-
-function syncAppSize(): void {
-  const root = appRoot.value;
-  if (!root) {
-    appSize.value = { width: 0, height: 0 };
-    return;
-  }
-  appSize.value = {
-    width: root.clientWidth,
-    height: root.clientHeight,
-  };
-}
-
-onMounted(() => {
-  syncAppSize();
-  if (typeof ResizeObserver === "undefined" || !appRoot.value) {
-    window.addEventListener("resize", syncAppSize);
-    return;
-  }
-  appResizeObserver = new ResizeObserver(() => {
-    syncAppSize();
-  });
-  appResizeObserver.observe(appRoot.value);
-});
-
-onUnmounted(() => {
-  if (appResizeObserver) {
-    appResizeObserver.disconnect();
-    appResizeObserver = null;
-  }
-  window.removeEventListener("resize", syncAppSize);
 });
 
 function onSidebarBlank(ev: MouseEvent): void {
@@ -271,7 +175,6 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
 
 <template>
   <div
-    ref="appRoot"
     class="app"
     :class="{
       'app--custom-background': customBackgroundActive,
@@ -279,19 +182,8 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
     :style="appStyle"
     :data-theme="state.settings.theme"
     >
-      <div v-if="customBackgroundActive" class="app__background app__background--topbar" aria-hidden="true">
-        <div class="app__backgroundImage app__backgroundImage--projected" :style="topbarBackgroundStyle" />
-      </div>
-
-      <div v-if="customBackgroundActive" class="app__background app__background--sidebar" aria-hidden="true">
-        <div class="app__backgroundImage app__backgroundImage--projected" :style="sidebarBackgroundStyle" />
-      </div>
-
-      <div v-if="customBackgroundActive" class="app__background app__background--main" aria-hidden="true">
-        <div
-          class="app__backgroundImage"
-          :style="mainBackgroundStyle"
-        />
+      <div v-if="customBackgroundActive" class="app__background app__background--full" aria-hidden="true">
+        <div class="app__backgroundImage" :style="backgroundStyle" />
       </div>
 
     <TopBar
