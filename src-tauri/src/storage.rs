@@ -19,7 +19,7 @@ pub struct LauncherState {
 }
 
 fn default_card_size() -> u32 {
-    120
+    150
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,7 +94,7 @@ fn default_language() -> String {
 }
 
 fn default_card_height() -> u32 {
-    96
+    90
 }
 
 fn default_theme() -> String {
@@ -118,7 +118,7 @@ fn default_card_font_size() -> u32 {
 }
 
 fn default_card_icon_scale() -> u32 {
-    56
+    50
 }
 
 fn default_dbl_click_blank_to_hide() -> bool {

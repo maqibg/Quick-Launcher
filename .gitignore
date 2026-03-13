@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+native-win32/target/
+native-win32/.tmp-*.png
 
 # Editor directories and files
 .vscode/*

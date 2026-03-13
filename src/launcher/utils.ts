@@ -24,8 +24,8 @@ export function suggestAppName(filePath: string): string {
 export function createDefaultState(): LauncherState {
   const settings: UiSettings = {
     language: guessSystemLanguage(),
-    cardWidth: 120,
-    cardHeight: 96,
+    cardWidth: 150,
+    cardHeight: 90,
     toggleHotkey: "",
     theme: "dark",
     sidebarWidth: 160,
@@ -33,7 +33,7 @@ export function createDefaultState(): LauncherState {
     fontColor: "",
     fontSize: 13,
     cardFontSize: 11,
-    cardIconScale: 56,
+    cardIconScale: 50,
     dblClickBlankToHide: true,
     alwaysOnTop: true,
     hideOnStartup: false,
