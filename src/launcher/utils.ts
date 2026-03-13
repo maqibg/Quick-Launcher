@@ -26,6 +26,8 @@ export function createDefaultState(): LauncherState {
     language: guessSystemLanguage(),
     cardWidth: 150,
     cardHeight: 90,
+    cardMaskOpacity: 100,
+    controlMaskOpacity: 100,
     toggleHotkey: "",
     theme: "dark",
     sidebarWidth: 160,

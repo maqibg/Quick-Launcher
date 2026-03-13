@@ -8,6 +8,8 @@ type Props = {
   language: string;
   cardWidth: number;
   cardHeight: number;
+  cardMaskOpacity: number;
+  controlMaskOpacity: number;
   toggleHotkey: string;
   theme: string;
   sidebarWidth: number;
@@ -38,6 +40,10 @@ const emit = defineEmits<{
   (e: "updateLanguage", value: string): void;
   (e: "updateCardWidth", value: number): void;
   (e: "updateCardHeight", value: number): void;
+  (e: "updateCardMaskOpacity", value: number): void;
+  (e: "updateControlMaskOpacity", value: number): void;
+  (e: "resetCardMaskOpacity"): void;
+  (e: "resetControlMaskOpacity"): void;
   (e: "applyHotkey", value: string): void;
   (e: "updateTheme", value: string): void;
   (e: "updateSidebarWidth", value: number): void;
@@ -64,6 +70,8 @@ const emit = defineEmits<{
 const language = ref("en");
 const cardWidth = ref(120);
 const cardHeight = ref(96);
+const cardMaskOpacity = ref(100);
+const controlMaskOpacity = ref(100);
 const toggleHotkey = ref("");
 const theme = ref("dark");
 const sidebarWidth = ref(150);
@@ -182,6 +190,8 @@ watch(
     language.value = props.language;
     cardWidth.value = props.cardWidth;
     cardHeight.value = props.cardHeight;
+    cardMaskOpacity.value = props.cardMaskOpacity;
+    controlMaskOpacity.value = props.controlMaskOpacity;
     toggleHotkey.value = props.toggleHotkey;
     theme.value = props.theme;
     sidebarWidth.value = props.sidebarWidth;
@@ -234,6 +244,48 @@ function onHeightInput(ev: Event): void {
   if (!Number.isFinite(next)) return;
   cardHeight.value = next;
   emit("updateCardHeight", next);
+}
+
+function onCardMaskOpacityInput(ev: Event): void {
+  const raw = (ev.target as HTMLInputElement).value;
+  const next = Number(raw);
+  if (!Number.isFinite(next)) return;
+  cardMaskOpacity.value = next;
+  emit("updateCardMaskOpacity", next);
+}
+
+function onControlMaskOpacityInput(ev: Event): void {
+  const raw = (ev.target as HTMLInputElement).value;
+  const next = Number(raw);
+  if (!Number.isFinite(next)) return;
+  controlMaskOpacity.value = next;
+  emit("updateControlMaskOpacity", next);
+}
+
+function onCardMaskOpacityNumber(ev: Event): void {
+  const raw = (ev.target as HTMLInputElement).value;
+  const next = Number(raw);
+  if (!Number.isFinite(next)) return;
+  cardMaskOpacity.value = next;
+  emit("updateCardMaskOpacity", next);
+}
+
+function onControlMaskOpacityNumber(ev: Event): void {
+  const raw = (ev.target as HTMLInputElement).value;
+  const next = Number(raw);
+  if (!Number.isFinite(next)) return;
+  controlMaskOpacity.value = next;
+  emit("updateControlMaskOpacity", next);
+}
+
+function onResetCardMaskOpacity(): void {
+  cardMaskOpacity.value = 100;
+  emit("resetCardMaskOpacity");
+}
+
+function onResetControlMaskOpacity(): void {
+  controlMaskOpacity.value = 100;
+  emit("resetControlMaskOpacity");
 }
 
 function onThemeChange(ev: Event): void {
@@ -483,6 +535,62 @@ function onApplyHotkey(): void {
             @input="onFontSizeInput"
           />
           <div class="field__hint">{{ fontSize }}px</div>
+        </label>
+
+        <label class="field">
+          <div class="field__label">{{ t("settings.maskOpacity.card") }}</div>
+          <div class="settingsScaleRow">
+            <input
+              class="field__input field__input--range settingsScaleRow__range"
+              type="range"
+              min="0"
+              max="200"
+              step="1"
+              :value="cardMaskOpacity"
+              @input="onCardMaskOpacityInput"
+            />
+            <input
+              class="field__input settingsScaleRow__number"
+              type="number"
+              min="0"
+              max="200"
+              step="1"
+              :value="cardMaskOpacity"
+              @input="onCardMaskOpacityNumber"
+            />
+            <button class="btn" type="button" @click="onResetCardMaskOpacity">
+              {{ t("settings.maskOpacity.reset") }}
+            </button>
+          </div>
+          <div class="field__hint">{{ cardMaskOpacity }}%</div>
+        </label>
+
+        <label class="field">
+          <div class="field__label">{{ t("settings.maskOpacity.control") }}</div>
+          <div class="settingsScaleRow">
+            <input
+              class="field__input field__input--range settingsScaleRow__range"
+              type="range"
+              min="0"
+              max="200"
+              step="1"
+              :value="controlMaskOpacity"
+              @input="onControlMaskOpacityInput"
+            />
+            <input
+              class="field__input settingsScaleRow__number"
+              type="number"
+              min="0"
+              max="200"
+              step="1"
+              :value="controlMaskOpacity"
+              @input="onControlMaskOpacityNumber"
+            />
+            <button class="btn" type="button" @click="onResetControlMaskOpacity">
+              {{ t("settings.maskOpacity.reset") }}
+            </button>
+          </div>
+          <div class="field__hint">{{ controlMaskOpacity }}%</div>
         </label>
 
         <label class="check">

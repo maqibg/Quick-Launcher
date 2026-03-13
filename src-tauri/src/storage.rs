@@ -34,6 +34,16 @@ pub struct UiSettings {
     pub card_width: u32,
     #[serde(rename = "cardHeight", default = "default_card_height")]
     pub card_height: u32,
+    #[serde(
+        rename = "cardMaskOpacity",
+        default = "default_mask_opacity"
+    )]
+    pub card_mask_opacity: u32,
+    #[serde(
+        rename = "controlMaskOpacity",
+        default = "default_mask_opacity"
+    )]
+    pub control_mask_opacity: u32,
     #[serde(rename = "toggleHotkey", default)]
     pub toggle_hotkey: String,
     #[serde(rename = "theme", default = "default_theme")]
@@ -97,6 +107,10 @@ fn default_card_height() -> u32 {
     90
 }
 
+fn default_mask_opacity() -> u32 {
+    100
+}
+
 fn default_theme() -> String {
     "dark".to_string()
 }
@@ -155,6 +169,8 @@ impl Default for UiSettings {
             language: default_language(),
             card_width: default_card_size(),
             card_height: default_card_height(),
+            card_mask_opacity: default_mask_opacity(),
+            control_mask_opacity: default_mask_opacity(),
             toggle_hotkey: String::new(),
             theme: default_theme(),
             sidebar_width: default_sidebar_width(),
@@ -211,6 +227,25 @@ fn db_path(_app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(base.join("data").join("launcher.db"))
 }
 
+fn repo_root_from_exe() -> Option<PathBuf> {
+    let base = crate::paths::app_base_dir()?;
+    let root = base.ancestors().nth(3)?.to_path_buf();
+    let ok = root.join("src-tauri").is_dir() && root.join("package.json").is_file();
+    ok.then_some(root)
+}
+
+fn wal_path(db_path: &PathBuf) -> PathBuf {
+    let mut s = db_path.as_os_str().to_os_string();
+    s.push("-wal");
+    PathBuf::from(s)
+}
+
+fn shm_path(db_path: &PathBuf) -> PathBuf {
+    let mut s = db_path.as_os_str().to_os_string();
+    s.push("-shm");
+    PathBuf::from(s)
+}
+
 fn legacy_db_paths(app: &tauri::AppHandle) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     // 旧版: %localappdata%/my-quickstart/launcher.db
@@ -222,6 +257,39 @@ fn legacy_db_paths(app: &tauri::AppHandle) -> Vec<PathBuf> {
     }
     if let Ok(p) = app.path().app_data_dir() {
         paths.push(p.join("launcher.db"));
+    }
+
+    // Dev-only convenience locations (repo checkout), useful when switching builds.
+    if let Some(root) = repo_root_from_exe() {
+        paths.push(root.join("数据备份").join("launcher.db"));
+        paths.push(
+            root.join("src-tauri")
+                .join("target")
+                .join("release")
+                .join("data")
+                .join("launcher.db"),
+        );
+        paths.push(
+            root.join("src-tauri")
+                .join("target")
+                .join("debug")
+                .join("data")
+                .join("launcher.db"),
+        );
+        paths.push(
+            root.join("native-win32")
+                .join("target")
+                .join("release")
+                .join("data")
+                .join("launcher.db"),
+        );
+        paths.push(
+            root.join("native-win32")
+                .join("target")
+                .join("debug")
+                .join("data")
+                .join("launcher.db"),
+        );
     }
     paths
 }
@@ -242,25 +310,110 @@ fn count_groups_in_existing_db(path: &PathBuf) -> i64 {
         .unwrap_or(0)
 }
 
+fn count_apps_in_existing_db(path: &PathBuf) -> i64 {
+    use rusqlite::OpenFlags;
+    if !path.exists() {
+        return 0;
+    }
+    let conn = match Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ) {
+        Ok(c) => c,
+        Err(_) => return 0,
+    };
+    conn.query_row("SELECT COUNT(1) FROM apps", [], |r| r.get(0))
+        .unwrap_or(0)
+}
+
 fn migrate_legacy_db_if_needed(app: &tauri::AppHandle, new_path: &PathBuf) -> Result<(), String> {
     let new_groups = count_groups_in_existing_db(new_path);
-    let need_migration = !new_path.exists() || new_groups == 0;
+    let new_apps = count_apps_in_existing_db(new_path);
+    let maybe_needs_migration = !new_path.exists() || new_groups == 0 || new_apps <= 10;
+    if !maybe_needs_migration {
+        return Ok(());
+    }
+
+    let mut best: Option<(PathBuf, i64, i64, u64, std::time::SystemTime)> = None;
+    for candidate in legacy_db_paths(app) {
+        if &candidate == new_path {
+            continue;
+        }
+        let groups = count_groups_in_existing_db(&candidate);
+        let apps = count_apps_in_existing_db(&candidate);
+        if groups <= 0 && apps <= 0 {
+            continue;
+        }
+        let meta = match std::fs::metadata(&candidate) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let wal_size = std::fs::metadata(wal_path(&candidate))
+            .map(|m| m.len())
+            .unwrap_or(0);
+        let total = meta.len().saturating_add(wal_size);
+        let modified = meta
+            .modified()
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        match &best {
+            Some((_p, best_apps, best_groups, best_total, best_modified))
+                if (*best_apps > apps)
+                    || (*best_apps == apps && *best_groups > groups)
+                    || (*best_apps == apps && *best_groups == groups && *best_total > total)
+                    || (*best_apps == apps
+                        && *best_groups == groups
+                        && *best_total == total
+                        && *best_modified >= modified) => {}
+            _ => best = Some((candidate, apps, groups, total, modified)),
+        }
+    }
+
+    let Some((legacy_path, legacy_apps, _legacy_groups, _legacy_total, _legacy_modified)) = best else {
+        return Ok(());
+    };
+
+    let need_migration = !new_path.exists()
+        || new_groups == 0
+        || (new_apps <= 10 && legacy_apps > new_apps);
     if !need_migration {
         return Ok(());
     }
 
-    let legacy_paths = legacy_db_paths(app);
-    let legacy_path = legacy_paths
-        .into_iter()
-        .find(|p| count_groups_in_existing_db(p) > 0);
-    let Some(legacy_path) = legacy_path else {
-        return Ok(());
-    };
-
     if let Some(parent) = new_path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
+
+    // Back up any existing local DB before overwriting; keep it next to the target DB so we
+    // still satisfy the "no files outside exe dir" constraint.
+    if new_path.is_file() {
+        let bak = PathBuf::from(format!("{}.bak", new_path.to_string_lossy()));
+        let _ = fs::remove_file(&bak);
+        let _ = fs::remove_file(wal_path(&bak));
+        let _ = fs::remove_file(shm_path(&bak));
+        let _ = fs::rename(new_path, &bak);
+        let wal = wal_path(new_path);
+        if wal.is_file() {
+            let _ = fs::rename(&wal, wal_path(&bak));
+        }
+        let shm = shm_path(new_path);
+        if shm.is_file() {
+            let _ = fs::rename(&shm, shm_path(&bak));
+        }
+    } else {
+        let _ = fs::remove_file(new_path);
+        let _ = fs::remove_file(wal_path(new_path));
+        let _ = fs::remove_file(shm_path(new_path));
+    }
+
     fs::copy(&legacy_path, new_path).map_err(|e| e.to_string())?;
+    let src_wal = wal_path(&legacy_path);
+    if src_wal.is_file() {
+        let _ = fs::copy(src_wal, wal_path(new_path));
+    }
+    let src_shm = shm_path(&legacy_path);
+    if src_shm.is_file() {
+        let _ = fs::copy(src_shm, shm_path(new_path));
+    }
     Ok(())
 }
 

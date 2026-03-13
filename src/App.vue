@@ -95,6 +95,10 @@ const {
   closeSettings,
   updateCardWidth,
   updateCardHeight,
+  updateCardMaskOpacity,
+  updateControlMaskOpacity,
+  resetCardMaskOpacity,
+  resetControlMaskOpacity,
   updateSidebarWidth,
   updateFontFamily,
   updateFontColor,
@@ -437,6 +441,8 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
       :language="state.settings.language"
       :card-width="state.settings.cardWidth"
       :card-height="state.settings.cardHeight"
+      :card-mask-opacity="state.settings.cardMaskOpacity"
+      :control-mask-opacity="state.settings.controlMaskOpacity"
       :toggle-hotkey="state.settings.toggleHotkey"
       :theme="state.settings.theme"
       :sidebar-width="state.settings.sidebarWidth"
@@ -461,6 +467,10 @@ function onSidebarGroupMouseDown(ev: MouseEvent, id: string): void {
       @close="closeSettings"
       @update-card-width="updateCardWidth"
       @update-card-height="updateCardHeight"
+      @update-card-mask-opacity="updateCardMaskOpacity"
+      @update-control-mask-opacity="updateControlMaskOpacity"
+      @reset-card-mask-opacity="resetCardMaskOpacity"
+      @reset-control-mask-opacity="resetControlMaskOpacity"
       @update-theme="updateTheme"
       @update-sidebar-width="updateSidebarWidth"
       @update-font-family="updateFontFamily"

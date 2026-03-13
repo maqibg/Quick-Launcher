@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, reactive } from "vue";
+import { onMounted, onUnmounted, reactive, ref } from "vue";
 import type { AppEntry } from "../launcher/types";
 import { t } from "../launcher/i18n";
 
@@ -39,6 +39,20 @@ const emit = defineEmits<{
   (e: "externalDragOverApp", ev: DragEvent, id: string): void;
   (e: "externalDrop", ev: DragEvent): void;
 }>();
+
+const gridEl = ref<HTMLElement | null>(null);
+const scrolling = ref(false);
+let scrollHideTimer: number | null = null;
+let removeScrollListener: (() => void) | null = null;
+
+function markScrolling(): void {
+  scrolling.value = true;
+  if (scrollHideTimer != null) window.clearTimeout(scrollHideTimer);
+  scrollHideTimer = window.setTimeout(() => {
+    scrollHideTimer = null;
+    scrolling.value = false;
+  }, 700);
+}
 
 const ghost = reactive<{
   active: boolean;
@@ -122,6 +136,19 @@ function onMouseDownApp(ev: MouseEvent, id: string): void {
 
 onUnmounted(() => {
   onGhostUp();
+  if (scrollHideTimer != null) {
+    window.clearTimeout(scrollHideTimer);
+    scrollHideTimer = null;
+  }
+  if (removeScrollListener) removeScrollListener();
+});
+
+onMounted(() => {
+  const el = gridEl.value;
+  if (!el) return;
+  const onScroll = () => markScrolling();
+  el.addEventListener("scroll", onScroll, { passive: true });
+  removeScrollListener = () => el.removeEventListener("scroll", onScroll);
 });
 
 function onDblClick(ev: MouseEvent): void {
@@ -136,7 +163,9 @@ function onDblClick(ev: MouseEvent): void {
 <template>
   <main class="main">
     <div
+      ref="gridEl"
       class="grid"
+      :class="{ 'grid--scrolling': scrolling }"
       @contextmenu.stop="(e) => emit('contextmenuBlank', e)"
       @dblclick.stop="onDblClick"
       @dragover="(e) => emit('externalDragOverBlank', e)"

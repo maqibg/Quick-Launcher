@@ -1045,6 +1045,32 @@ export function useLauncherModel() {
     scheduleSave();
   }
 
+  function clampMaskOpacity(value: number): number {
+    const v = Math.round(value);
+    if (!Number.isFinite(v)) return 100;
+    return Math.min(200, Math.max(0, v));
+  }
+
+  function updateCardMaskOpacity(value: number): void {
+    state.settings.cardMaskOpacity = clampMaskOpacity(value);
+    scheduleSave();
+  }
+
+  function updateControlMaskOpacity(value: number): void {
+    state.settings.controlMaskOpacity = clampMaskOpacity(value);
+    scheduleSave();
+  }
+
+  function resetCardMaskOpacity(): void {
+    state.settings.cardMaskOpacity = 100;
+    scheduleSave();
+  }
+
+  function resetControlMaskOpacity(): void {
+    state.settings.controlMaskOpacity = 100;
+    scheduleSave();
+  }
+
   function updateTheme(value: string): void {
     state.settings.theme = normalizeTheme(value);
     scheduleSave();
@@ -1379,6 +1405,7 @@ export function useLauncherModel() {
     updateCardWidth, updateCardHeight, updateSidebarWidth, updateFontFamily, updateFontColor, resetFontColor, updateFontSize,
     updateCardFontSize, updateCardIconScale, updateTheme, updateDblClickBlankToHide,
     updateLanguage, updateAlwaysOnTop, updateHideOnStartup, updateUseRelativePath, updateEnableGroupDragSort, updateAutoStart,
+    updateCardMaskOpacity, updateControlMaskOpacity, resetCardMaskOpacity, resetControlMaskOpacity,
     updateCustomBackgroundEnabled, updateCustomBackgroundBlur, updateCustomBackgroundScaleX, updateCustomBackgroundScaleY,
     pickCustomBackground, clearCustomBackground,
     applyToggleHotkey, onMainBlankDoubleClick,

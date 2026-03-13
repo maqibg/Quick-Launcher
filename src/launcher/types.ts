@@ -23,6 +23,8 @@ export type UiSettings = {
   language: UiLanguage;
   cardWidth: number;
   cardHeight: number;
+  cardMaskOpacity: number;
+  controlMaskOpacity: number;
   toggleHotkey: string;
   theme: "dark" | "light";
   sidebarWidth: number;

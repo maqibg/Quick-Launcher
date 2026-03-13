@@ -35,6 +35,11 @@ export function clampCardHeight(value: number): number {
   return clamp(Math.round(value), 40, 360);
 }
 
+export function clampMaskOpacity(value: number): number {
+  // Percent multiplier for base alpha. 100 means default.
+  return clamp(Math.round(value), 0, 200);
+}
+
 export function clampSidebarWidth(value: number): number {
   return clamp(Math.round(value), 160, 320);
 }
@@ -66,6 +71,16 @@ export function applyLoadedUiSettings(target: UiSettings, loaded: UiSettings): v
   }
   target.cardWidth = clampCardWidth(loaded.cardWidth);
   target.cardHeight = clampCardHeight(loaded.cardHeight);
+
+  const maybeCardMaskOpacity = (loaded as any).cardMaskOpacity;
+  if (typeof maybeCardMaskOpacity === "number") {
+    target.cardMaskOpacity = clampMaskOpacity(maybeCardMaskOpacity);
+  }
+  const maybeControlMaskOpacity = (loaded as any).controlMaskOpacity;
+  if (typeof maybeControlMaskOpacity === "number") {
+    target.controlMaskOpacity = clampMaskOpacity(maybeControlMaskOpacity);
+  }
+
   target.toggleHotkey = loaded.toggleHotkey ?? "";
   target.theme = normalizeTheme((loaded as any).theme);
 
@@ -151,6 +166,8 @@ export function computeAppStyle(settings: UiSettings): Record<string, string> {
     "--card-icon-size": `${icon}px`,
     "--card-icon-img-size": `${iconImg}px`,
     "--card-font-size": `${clampCardFontSize(settings.cardFontSize)}px`,
+    "--ui-card-mask-opacity": `${clampMaskOpacity(settings.cardMaskOpacity)}`,
+    "--ui-control-mask-opacity": `${clampMaskOpacity(settings.controlMaskOpacity)}`,
     "--sidebar-width": `${clampSidebarWidth(settings.sidebarWidth)}px`,
     "--font-family": resolveFontFamilyCss(settings.fontFamily),
     "--text": fontColor,
